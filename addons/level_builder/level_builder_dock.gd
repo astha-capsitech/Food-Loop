@@ -84,7 +84,6 @@ var route_pos_x: SpinBox
 var route_pos_y: SpinBox
 var route_scale_x: SpinBox
 var route_scale_y: SpinBox
-var route_rot_spin: SpinBox
 var loop_settings_box: VBoxContainer
 var entry_settings_box: VBoxContainer
 var exit_settings_box: VBoxContainer
@@ -296,11 +295,6 @@ func _build_loop_settings(parent: Control) -> void:
 	route_scale_y = _make_spinbox(0.05, 10.0, 0.01, 1.0, 45.0)
 	route_scale_y.value_changed.connect(func(v): if current_config: current_config.route_scale.y = v; _mark_dirty())
 	row2.add_child(route_scale_y)
-
-	row2.add_child(_make_label("  Rot°:"))
-	route_rot_spin = _make_spinbox(-360.0, 360.0, 0.5, 0.0, 55.0)
-	route_rot_spin.value_changed.connect(func(v): if current_config: current_config.route_rotation = deg_to_rad(v); _mark_dirty())
-	row2.add_child(route_rot_spin)
 
 	# Row 3: Auto Circle Generator
 	var row3 := HBoxContainer.new()
@@ -673,7 +667,7 @@ func _sync_ui_from_config() -> void:
 	route_pos_y.value   = current_config.route_position.y
 	route_scale_x.value = current_config.route_scale.x
 	route_scale_y.value = current_config.route_scale.y
-	route_rot_spin.value = rad_to_deg(current_config.route_rotation)
+	current_config.route_rotation = 0.0
 
 	if is_instance_valid(queue_pos_x): queue_pos_x.value = current_config.queue_base_position.x
 	if is_instance_valid(queue_pos_y): queue_pos_y.value = current_config.queue_base_position.y
@@ -696,7 +690,7 @@ func _block_signals(blocked: bool) -> void:
 	for node in [timer_spin, speed_spin, gap_spin, randomize_check,
 	             queue_count_spin, has_exit_check,
 	             route_pos_x, route_pos_y, route_scale_x,
-	             route_scale_y, route_rot_spin,
+	             route_scale_y,
 	             queue_pos_x, queue_pos_y, queue_step_x, queue_step_y]:
 		if is_instance_valid(node):
 			node.set_block_signals(blocked)
@@ -708,12 +702,10 @@ func _auto_align_queue_to_entry() -> void:
 	if current_config.entry_points.is_empty():
 		return
 	var ep0: Vector2 = current_config.entry_points[0]
-	var xform := Transform2D(current_config.route_rotation, current_config.route_position).scaled(current_config.route_scale)
-	var world_ep0: Vector2 = xform * ep0
 	var step_offset := current_config.queue_step
 	if step_offset.length_squared() < 0.001:
 		step_offset = Vector2(0.0, 44.0)
-	current_config.queue_base_position = world_ep0 + step_offset
+	current_config.queue_base_position = current_config.route_position + ep0 + step_offset
 	_sync_ui_from_config()
 	_mark_dirty()
 	_update_canvas()
@@ -1056,10 +1048,11 @@ func on_canvas_draw(canvas: Control) -> void:
 
 	# Sprite
 	if current_config.track_texture:
-		var tsz := current_config.track_texture.get_size() * canvas_zoom
-		var tpos := canvas.size * 0.5 - tsz * 0.5 + canvas_pan
-		canvas.draw_texture_rect(current_config.track_texture,
-			Rect2(tpos, tsz), false, Color(1, 1, 1, 0.88))
+		var tex: Texture2D = current_config.track_texture
+		var tsz: Vector2 = tex.get_size() * canvas_zoom
+		var center: Vector2 = canvas.size * 0.5 + canvas_pan
+		var tpos: Vector2 = center - tsz * 0.5
+		canvas.draw_texture_rect(tex, Rect2(tpos, tsz), false, Color(1, 1, 1, 0.88))
 
 	# Loop path
 	var lp := current_config.loop_points
@@ -1115,22 +1108,22 @@ func on_canvas_draw(canvas: Control) -> void:
 
 	# Queue visual preview
 	if current_config:
-		var xform := Transform2D(current_config.route_rotation, current_config.route_position).scaled(current_config.route_scale)
-		var inv_xform := xform.affine_inverse()
 		var q_count: int = current_config.queue_count
 		var q_indices := current_config.queue_fruit_indices
 		var sheet := _get_sheet()
 
+		# Queue base position relative to route center
+		var q_base_rel: Vector2 = current_config.queue_base_position - current_config.route_position
+		var q_base_canvas: Vector2 = _world_to_canvas(q_base_rel, canvas)
+
 		# Draw queue connector line
 		if q_count > 1:
-			var p0_local: Vector2 = inv_xform * current_config.queue_base_position
-			var p_last_local: Vector2 = inv_xform * (current_config.queue_base_position + current_config.queue_step * float(q_count - 1))
-			canvas.draw_line(_world_to_canvas(p0_local, canvas), _world_to_canvas(p_last_local, canvas), Color(0.2, 0.7, 1.0, 0.45), 2.0)
+			var p0_canvas: Vector2 = q_base_canvas
+			var p_last_canvas: Vector2 = q_base_canvas + current_config.queue_step * canvas_zoom * float(q_count - 1)
+			canvas.draw_line(p0_canvas, p_last_canvas, Color(0.2, 0.7, 1.0, 0.45), 2.0)
 
 		for qi in range(q_count):
-			var slot_world: Vector2 = current_config.queue_base_position + current_config.queue_step * float(qi)
-			var slot_local: Vector2 = inv_xform * slot_world
-			var slot_canvas: Vector2 = _world_to_canvas(slot_local, canvas)
+			var slot_canvas: Vector2 = q_base_canvas + current_config.queue_step * canvas_zoom * float(qi)
 
 			var fruit_idx: int = 0
 			if q_indices.size() > 0:
@@ -1251,8 +1244,7 @@ func on_canvas_input(event: InputEvent, canvas: Control) -> void:
 		elif is_dragging:
 			if selected_is_queue and current_config:
 				var world := _canvas_to_world(mm.position, canvas)
-				var xform := Transform2D(current_config.route_rotation, current_config.route_position).scaled(current_config.route_scale)
-				current_config.queue_base_position = xform * world
+				current_config.queue_base_position = current_config.route_position + world
 				if is_instance_valid(queue_pos_x): queue_pos_x.set_value_no_signal(current_config.queue_base_position.x)
 				if is_instance_valid(queue_pos_y): queue_pos_y.set_value_no_signal(current_config.queue_base_position.y)
 				_mark_dirty()
@@ -1286,9 +1278,8 @@ func _handle_left_click(mouse: Vector2, canvas: Control) -> void:
 
 		EditMode.ENTRY:
 			if current_config:
-				var xform := Transform2D(current_config.route_rotation, current_config.route_position).scaled(current_config.route_scale)
-				var q0_local: Vector2 = xform.affine_inverse() * current_config.queue_base_position
-				var q0_canvas: Vector2 = _world_to_canvas(q0_local, canvas)
+				var q_base_rel: Vector2 = current_config.queue_base_position - current_config.route_position
+				var q0_canvas: Vector2 = _world_to_canvas(q_base_rel, canvas)
 				if q0_canvas.distance_to(mouse) <= 16.0:
 					selected_is_queue = true
 					is_dragging = true
@@ -1427,7 +1418,7 @@ func _create_sample_levels() -> void:
 	l1.track_texture     = load("res://Assets/Sprites/Levl1.png")
 	l1.route_position    = Vector2(353.18, 821.28)
 	l1.route_scale       = Vector2(1.1746, 1.5204)
-	l1.route_rotation    = PI
+	l1.route_rotation    = 0.0
 	l1.loop_points       = PackedVector2Array([
 		Vector2(-21.13, -59.01), Vector2(-218.99, -41.0),
 		Vector2(-272.99, 11.0),  Vector2(-259.99, 211.0),

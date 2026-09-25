@@ -38,16 +38,17 @@ var exit_path_nodes: Array[Path2D] = []
 var exit_progs: Array[float] = []
 
 # ─── Scene nodes ─────────────────────────────────────────────────────────────
-@onready var route:          Node2D    = $Route
-@onready var oval_sprite:    Sprite2D  = $Route/OvalSprite
-@onready var entry_road:     Line2D    = $Route/EntryRoad
-@onready var exit_road:      Line2D    = $Route/ExitRoad
-@onready var entry_dashes:   Line2D    = $Route/EntryDashes
-@onready var exit_dashes:    Line2D    = $Route/ExitDashes
-@onready var loop_path:      Path2D    = $Route/Path2D
-@onready var exit_path:      Path2D    = $Route/ExitPath2D
-@onready var exit_indicator: Polygon2D = $Route/ExitIndicator
-@onready var queue_container: Node2D   = $Queue
+@onready var level_root:      Node2D    = $LevelRoot
+@onready var route:           Node2D    = $LevelRoot/Route
+@onready var oval_sprite:     Sprite2D  = $LevelRoot/Route/OvalSprite
+@onready var entry_road:      Line2D    = $LevelRoot/Route/EntryRoad
+@onready var exit_road:       Line2D    = $LevelRoot/Route/ExitRoad
+@onready var entry_dashes:    Line2D    = $LevelRoot/Route/EntryDashes
+@onready var exit_dashes:     Line2D    = $LevelRoot/Route/ExitDashes
+@onready var loop_path:       Path2D    = $LevelRoot/Route/Path2D
+@onready var exit_path:       Path2D    = $LevelRoot/Route/ExitPath2D
+@onready var exit_indicator:  Polygon2D = $LevelRoot/Route/ExitIndicator
+@onready var queue_container: Node2D   = $LevelRoot/Queue
 
 @onready var canvas_layer: CanvasLayer = $CanvasLayer
 @onready var gamepanel:   GamePanel   = $CanvasLayer/Gamepanel
@@ -99,6 +100,7 @@ func _ready() -> void:
 	start_panel.start_pressed.connect(start_game)
 	win_panel.next_pressed.connect(go_to_next_level)
 	lose_panel.restart_pressed.connect(restart_level)
+	get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 	load_level(current_level_index)
 
@@ -166,41 +168,34 @@ func _clear_level_state() -> void:
 func _apply_config() -> void:
 	level_timer = active_config.level_time
 
-	# ── Scale authored positions from design resolution → actual viewport ──────
-	# All LevelConfig positions were painted at DESIGN_W × DESIGN_H.
-	# We map them proportionally so the layout stays centred on every device.
-	var vp_size: Vector2 = get_viewport().get_visible_rect().size
-	vp_scale_x = vp_size.x / DESIGN_W
-	vp_scale_y = vp_size.y / DESIGN_H
-
-	# ── Route transform ───────────────────────────────────────────────────────
-	route.position = active_config.route_position * Vector2(vp_scale_x, vp_scale_y)
-	route.rotation = active_config.route_rotation
+	# ── 1. Route transform in LevelRoot space (origin is always (0, 0)) ─────────
+	route.position = Vector2.ZERO
+	route.rotation = 0.0
 	route.scale    = active_config.route_scale
 
-	# ── OvalSprite at origin of Route (same centre as the loop Path2D) ─────────
+	# ── 2. OvalSprite at origin of Route (same centre as the loop Path2D) ─────────
 	if active_config.track_texture:
 		oval_sprite.texture  = active_config.track_texture
-		oval_sprite.position = Vector2.ZERO   # centred on Route, same as old Sprite2D
+		oval_sprite.position = Vector2.ZERO   # centred on Route
 		oval_sprite.visible  = true
 	else:
 		oval_sprite.visible = false
 
-	# ── Build loop curve ──────────────────────────────────────────────────────
+	# ── 3. Build loop curve ──────────────────────────────────────────────────────
 	loop_path.curve = active_config.get_loop_curve()
 
-	# ── Anchor queue to entry point ──────────────────────────────────────────
-	# Exactly like exit anchors to exit_points[0], queue anchors directly
-	# to entry_points[0] world position so it enters seamlessly from any angle.
+	# ── 4. Anchor queue to entry point (in LevelRoot space) ───────────────────
 	if not active_config.entry_points.is_empty():
-		queue_container.global_position = route.to_global(active_config.entry_points[0])
+		queue_container.position = active_config.entry_points[0] * active_config.route_scale
 	else:
-		queue_container.global_position = active_config.queue_base_position * Vector2(vp_scale_x, vp_scale_y)
+		var q_rel: Vector2 = active_config.queue_base_position - active_config.route_position
+		queue_container.position = q_rel
+	queue_container.rotation = 0.0
 
-	# ── Auto-generate Entry Road visual along the queue direction ────────────
+	# ── 5. Auto-generate Entry Road visual along the queue direction ────────────
 	_rebuild_entry_road()
 
-	# ── Setup exit paths ─────────────────────────────────────────────────────
+	# ── 6. Setup exit paths ─────────────────────────────────────────────────────
 	if active_config.has_exit and not active_config.exit_configs.is_empty():
 		exit_indicator.show()
 		for i: int in range(active_config.exit_configs.size()):
@@ -239,6 +234,68 @@ func _apply_config() -> void:
 		exit_indicator.hide()
 		_clear_exit_road()
 
+	# ── 7. Responsive scaling and centering ───────────────────────────────────
+	_apply_responsive_layout()
+
+
+func _on_viewport_size_changed() -> void:
+	if active_config:
+		_apply_responsive_layout()
+
+
+## Responsively scales LevelRoot as a single unit so the loop occupies ~75% of
+## the available viewport width and is centered horizontally.
+func _apply_responsive_layout() -> void:
+	if not active_config or not is_instance_valid(level_root):
+		return
+
+	var vp_size: Vector2 = get_viewport().get_visible_rect().size
+	if vp_size.x <= 0.0 or vp_size.y <= 0.0:
+		return
+
+	vp_scale_x = vp_size.x / DESIGN_W
+	vp_scale_y = vp_size.y / DESIGN_H
+
+	# ── 1. Measure base authored width of the track/loop in design space ────────
+	var base_width: float = 0.0
+
+	var pts: PackedVector2Array = active_config.loop_points
+	if pts.is_empty() and is_instance_valid(loop_path) and loop_path.curve:
+		pts = loop_path.curve.get_baked_points()
+
+	if pts.size() >= 3:
+		var min_x := INF
+		var max_x := -INF
+		for p: Vector2 in pts:
+			min_x = minf(min_x, p.x)
+			max_x = maxf(max_x, p.x)
+		base_width = (max_x - min_x) * absf(active_config.route_scale.x)
+	elif active_config.track_texture:
+		var tex_sz: Vector2 = active_config.track_texture.get_size()
+		base_width = tex_sz.x * absf(active_config.route_scale.x)
+
+	if base_width <= 10.0:
+		base_width = DESIGN_W * 0.75 # Default fallback: 540.0 px
+
+	# ── 2. Target width: exactly 75% of current viewport width ─────────────────
+	var target_width: float = vp_size.x * 0.75
+
+	# ── 3. Responsive scale factor ─────────────────────────────────────────────
+	# On higher resolutions (e.g. 1080p, 1440p) scale_factor > 1.0 (scales UP)
+	# On lower resolutions (e.g. 480p) scale_factor < 1.0 (scales DOWN)
+	var scale_factor: float = target_width / base_width
+	level_root.scale = Vector2(scale_factor, scale_factor)
+
+	# ── 4. Horizontal centering ────────────────────────────────────────────────
+	# Since route.position is Vector2.ZERO inside LevelRoot, placing LevelRoot at
+	# vp_size.x * 0.5 GUARANTEES route/sprite is dead center on every resolution.
+	level_root.position.x = vp_size.x * 0.5
+
+	# ── 5. Vertical positioning ────────────────────────────────────────────────
+	# Preserve the authored vertical proportion (default ~44% from top of screen)
+	var authored_y: float = active_config.route_position.y if active_config.route_position.y > 0.0 else 560.0
+	level_root.position.y = vp_size.y * (authored_y / DESIGN_H)
+
 
 ## Entry road extends from entry_local outward along the queue direction (matching queue_step).
 func _rebuild_entry_road() -> void:
@@ -248,17 +305,7 @@ func _rebuild_entry_road() -> void:
 		return
 
 	var entry_local: Vector2 = active_config.entry_points[0]
-	
-	# Determine road direction along the queue line (Route-local)
-	var dir: Vector2 = Vector2.DOWN
-	if active_config.queue_step.length_squared() > 0.001:
-		var p0: Vector2 = route.to_local(queue_container.global_position)
-		var p1: Vector2 = route.to_local(queue_container.global_position + active_config.queue_step)
-		var step_dir: Vector2 = p1 - p0
-		if step_dir.length_squared() > 0.001:
-			dir = step_dir.normalized()
-
-	var far_local: Vector2 = entry_local + dir * 3000.0
+	var far_local: Vector2 = entry_local + Vector2.DOWN * 3000.0
 
 	entry_road.add_point(entry_local)
 	entry_road.add_point(far_local)
@@ -437,6 +484,9 @@ func get_colliding_food_at_entry() -> Food:
 		loop_path.curve, entry_round_robin)
 	for f: Food in circulating:
 		if not is_instance_valid(f) or f.state != Food.State.CIRCULATING:
+			continue
+		# Protect newly entered queue fruits while they are still in the entry area
+		if f.is_player and f.total_travel < active_config.min_gap:
 			continue
 		var diff: float = absf(fposmod(f.progress - entry_prog, curve_len))
 		diff = minf(diff, curve_len - diff)

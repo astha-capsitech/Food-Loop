@@ -1,21 +1,16 @@
-[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://byp1xqyvb7std"]
+[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://bwm6wlgj6ck3x"]
 
 [ext_resource type="Script" uid="uid://dmahiwhvw8t5g" path="res://ExitConfig.gd" id="1_vhvcw"]
 [ext_resource type="Script" uid="uid://cfjkkrdpu30da" path="res://LevelConfig.gd" id="2_vumh6"]
-[ext_resource type="Texture2D" uid="uid://b4y26tuxc1i3h" path="res://Assets/Sprites/Levl1.png" id="3_py7d5"]
+[ext_resource type="Texture2D" uid="uid://bq46ek6us3v4k" path="res://Assets/Sprites/cube.png" id="3_vhvcw"]
 
 [resource]
 script = ExtResource("2_vumh6")
 title = "Level 1"
-track_texture = ExtResource("3_py7d5")
-route_position = Vector2(353.18, 821.28)
-route_scale = Vector2(1.1746, 1.5204)
-route_rotation = 3.141592653589793
-loop_points = PackedVector2Array(-1.7335204, -53.443024, 220.94576, -53.443024, 262.51254, 2.9690568, 256.57443, 133.60756, 250.63632, 201.89587, 197.1933, 249.40079, 4.2045937, 258.30795, -165.03165, 252.36984, -245.1962, 222.67928, -257.07242, 136.57661, -257.07242, 14.845284, -239.25807, -41.5668, -70.02183, -59.381138)
-speed = 200.0
-min_gap = 42.0
-entry_points = PackedVector2Array(-21.13, -59.01)
-queue_fruit_indices = PackedInt32Array(0, 1, 2, 3)
-queue_count = 4
-queue_base_position = Vector2(349, 960)
-initial_fruit_indices = PackedInt32Array(2, 3, 4, 5, 6)
+track_texture = ExtResource("3_vhvcw")
+loop_points = PackedVector2Array(12.079478, 138.51135, 119.98948, 144.95374, 168.30739, 115.96299, 174.74979, 70.86627, 176.36038, -75.69806, 158.64381, -119.18418, 107.104706, -140.12195, -95.83053, -140.12195, -158.64381, -119.18418, -179.58157, -80.529854, -179.58157, 80.529854, -148.98022, 125.62657, -100.662315, 140.12195)
+entry_points = PackedVector2Array(-7.953258, 158.34215)
+queue_fruit_indices = PackedInt32Array(8, 9, 7)
+queue_count = 3
+queue_base_position = Vector2(352.04675, 842.34216)
+initial_fruit_indices = PackedInt32Array(0, 1, 2, 4)

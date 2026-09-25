@@ -1,26 +1,23 @@
-[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://coytgdbi8qor4"]
+[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://dcbv7x6d1hic4"]
 
 [ext_resource type="Script" uid="uid://dmahiwhvw8t5g" path="res://ExitConfig.gd" id="1_kcobs"]
 [ext_resource type="Script" uid="uid://cfjkkrdpu30da" path="res://LevelConfig.gd" id="2_oq5t2"]
-[ext_resource type="Texture2D" uid="uid://25ln0v8xtdmv" path="res://Assets/Sprites/Level2sprite.png" id="3_d3u46"]
+[ext_resource type="Texture2D" uid="uid://bq46ek6us3v4k" path="res://Assets/Sprites/cube.png" id="3_kcobs"]
 
-[sub_resource type="Resource" id="Resource_kcobs"]
+[sub_resource type="Resource" id="Resource_oq5t2"]
 script = ExtResource("1_kcobs")
-exit_points = PackedVector2Array(0, -105, 0, -260, 0, -500)
+exit_points = PackedVector2Array(-2.3993485, -155.15787, -2.3993485, -203.14484, -0.7997829, -233.53659)
 
 [resource]
 script = ExtResource("2_oq5t2")
 level_number = 2
 title = "Level 2"
-track_texture = ExtResource("3_d3u46")
-route_position = Vector2(360, 560)
-route_scale = Vector2(1.35, 1.35)
-loop_points = PackedVector2Array(0, 105, -40.18, 97, -74.25, 74.25, -97, 40.18, -105, 0, -97, -40.18, -74.25, -74.25, -40.18, -97, 0, -105, 40.18, -97, 74.25, -74.25, 97, -40.18, 105, 0, 97, 40.18, 74.25, 74.25, 40.18, 97, 0, 105)
-speed = 75.0
-min_gap = 45.0
-entry_points = PackedVector2Array(0, 105)
+track_texture = ExtResource("3_kcobs")
+loop_points = PackedVector2Array(-0.8052985, 146.56433, 118.37888, 148.17493, 165.0862, 124.015976, 174.74979, 62.813286, 173.13919, -86.972244, 153.81203, -124.015976, 108.7153, -138.51135, -111.93649, -144.95374, -158.64381, -124.015976, -181.19217, -77.30866, -179.58157, 80.529854, -157.03322, 124.015976, -103.883514, 143.34314)
+entry_points = PackedVector2Array(0.13751437, 172.88396)
 has_exit = true
-exit_configs = Array[ExtResource("1_kcobs")]([SubResource("Resource_kcobs")])
-queue_fruit_indices = PackedInt32Array(0, 1, 2, 3, 0, 1)
-queue_base_position = Vector2(360, 750)
-initial_fruit_indices = PackedInt32Array(2, 3, 4)
+exit_configs = Array[ExtResource("1_kcobs")]([SubResource("Resource_oq5t2")])
+queue_fruit_indices = PackedInt32Array(9, 8, 2)
+queue_count = 3
+queue_base_position = Vector2(359.27698, 842.34216)
+initial_fruit_indices = PackedInt32Array(2, 1, 0, 3)
