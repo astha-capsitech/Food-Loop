@@ -84,11 +84,18 @@ func _process(delta: float) -> void:
 			total_travel += step
 		State.EXITING:
 			progress += speed * delta
+			# Only for exit path: queue_free when food has left the screen (viewport)
+			var screen_rect: Rect2 = get_viewport_rect().grow(target_size)
+			var is_off_screen: bool = not screen_rect.has_point(global_position)
 			var parent_path: Path2D = get_parent() as Path2D
+			var is_curve_end: bool = false
 			if parent_path and parent_path.curve:
 				var baked_len: float = parent_path.curve.get_baked_length()
-				if (baked_len <= 1.0 or progress >= baked_len) and not has_exited:
-					has_exited = true
-					set_process(false)
-					food_exited.emit(self)
-					queue_free()
+				if baked_len > 1.0 and progress >= baked_len:
+					is_curve_end = true
+
+			if (is_off_screen or is_curve_end) and not has_exited:
+				has_exited = true
+				set_process(false)
+				food_exited.emit(self)
+				queue_free()

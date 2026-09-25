@@ -214,6 +214,12 @@ func _apply_config() -> void:
 			var exit_curve := Curve2D.new()
 			for p: Vector2 in ecfg.exit_points:
 				exit_curve.add_point(p)
+			# Extend exit path straight off-screen so exiting food can travel past the viewport boundary
+			if ecfg.exit_points.size() >= 2:
+				var last_pt: Vector2 = ecfg.exit_points[-1]
+				var prev_pt: Vector2 = ecfg.exit_points[-2]
+				var exit_dir: Vector2 = (last_pt - prev_pt).normalized()
+				exit_curve.add_point(last_pt + exit_dir * 3000.0)
 			ep_node.curve = exit_curve
 
 			exit_path_nodes.append(ep_node)
