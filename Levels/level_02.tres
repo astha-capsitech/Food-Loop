@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://coytgdbi8qor4"]
+
+[ext_resource type="Script" uid="uid://dmahiwhvw8t5g" path="res://ExitConfig.gd" id="1_kcobs"]
+[ext_resource type="Script" uid="uid://cfjkkrdpu30da" path="res://LevelConfig.gd" id="2_oq5t2"]
+[ext_resource type="Texture2D" uid="uid://25ln0v8xtdmv" path="res://Assets/Sprites/Level2sprite.png" id="3_d3u46"]
+
+[sub_resource type="Resource" id="Resource_kcobs"]
+script = ExtResource("1_kcobs")
+exit_points = PackedVector2Array(0, -105, 0, -260, 0, -500)
+
+[resource]
+script = ExtResource("2_oq5t2")
+level_number = 2
+title = "Level 2"
+track_texture = ExtResource("3_d3u46")
+route_position = Vector2(360, 560)
+route_scale = Vector2(1.35, 1.35)
+loop_points = PackedVector2Array(0, 105, -40.18, 97, -74.25, 74.25, -97, 40.18, -105, 0, -97, -40.18, -74.25, -74.25, -40.18, -97, 0, -105, 40.18, -97, 74.25, -74.25, 97, -40.18, 105, 0, 97, 40.18, 74.25, 74.25, 40.18, 97, 0, 105)
+speed = 75.0
+min_gap = 45.0
+entry_points = PackedVector2Array(0, 105)
+has_exit = true
+exit_configs = Array[ExtResource("1_kcobs")]([SubResource("Resource_kcobs")])
+queue_fruit_indices = PackedInt32Array(0, 1, 2, 3, 0, 1)
+queue_base_position = Vector2(360, 750)
+initial_fruit_indices = PackedInt32Array(2, 3, 4)

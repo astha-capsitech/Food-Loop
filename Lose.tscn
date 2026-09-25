@@ -1,0 +1,52 @@
+[gd_scene format=3 uid="uid://dl2v0b5bgjgic"]
+
+[ext_resource type="Script" uid="uid://cofc1s2mkk15j" path="res://lose.gd" id="1_a6gma"]
+[ext_resource type="Texture2D" uid="uid://mmqhlqtqnprs" path="res://Assets/Sprites/Solid_green.png" id="1_mexgb"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_uvm4r"]
+font_size = 50
+
+[node name="LosePanel" type="Control" unique_id=925156161 node_paths=PackedStringArray("restartbtn")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_a6gma")
+restartbtn = NodePath("Panel/Restart")
+
+[node name="Panel" type="Panel" parent="." unique_id=499498110]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Restart" type="TextureButton" parent="Panel" unique_id=970261417]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+texture_normal = ExtResource("1_mexgb")
+
+[node name="Label" type="Label" parent="Panel/Restart" unique_id=1696559373]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Restart"
+label_settings = SubResource("LabelSettings_uvm4r")
+horizontal_alignment = 1
+vertical_alignment = 1

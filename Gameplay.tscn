@@ -1,0 +1,75 @@
+[gd_scene format=3 uid="uid://dynqdsuy6xvoh"]
+
+[ext_resource type="Script" uid="uid://7xb7avdceh7m" path="res://Gameplay.gd" id="1_k2aq1"]
+[ext_resource type="PackedScene" uid="uid://bopa1hoxhm8ay" path="res://Food.tscn" id="2_vrd06"]
+[ext_resource type="PackedScene" uid="uid://ilte4duf1i14" path="res://gamepanel.tscn" id="4_pskrv"]
+[ext_resource type="PackedScene" uid="uid://e4kmnrm2uiyi" path="res://Wining.tscn" id="5_gqb3i"]
+[ext_resource type="PackedScene" uid="uid://bpkjsyo63ert6" path="res://start.tscn" id="6_yqu6c"]
+[ext_resource type="PackedScene" uid="uid://dl2v0b5bgjgic" path="res://Lose.tscn" id="7_wnni2"]
+
+[sub_resource type="Curve2D" id="Curve2D_loop"]
+_data = {
+"points": PackedVector2Array(0, -105, 0, 0, 0, -105, 0, 0, 0, 0, 0, -105)
+}
+point_count = 2
+
+[sub_resource type="Curve2D" id="Curve2D_exit"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, 0, 200, 0, 0, 0, 0, 0, 0)
+}
+point_count = 2
+
+[node name="Gameplay" type="Node2D" unique_id=225288101]
+script = ExtResource("1_k2aq1")
+food_scene = ExtResource("2_vrd06")
+
+[node name="FoodContainer" type="Node2D" parent="." unique_id=883714941]
+
+[node name="Route" type="Node2D" parent="." unique_id=148242468]
+position = Vector2(360, 640)
+
+[node name="OvalSprite" type="Sprite2D" parent="Route" unique_id=111111111]
+
+[node name="EntryRoad" type="Line2D" parent="Route" unique_id=222222222]
+width = 54.0
+default_color = Color(0.22, 0.22, 0.22, 1)
+joint_mode = 2
+
+[node name="ExitRoad" type="Line2D" parent="Route" unique_id=333333333]
+width = 54.0
+default_color = Color(0.22, 0.22, 0.22, 1)
+joint_mode = 2
+
+[node name="EntryDashes" type="Line2D" parent="Route" unique_id=444444444]
+width = 3.0
+default_color = Color(0.8, 0.8, 0.8, 0.6)
+joint_mode = 2
+
+[node name="ExitDashes" type="Line2D" parent="Route" unique_id=555555555]
+width = 3.0
+default_color = Color(0.8, 0.8, 0.8, 0.6)
+joint_mode = 2
+
+[node name="Path2D" type="Path2D" parent="Route" unique_id=268826109]
+curve = SubResource("Curve2D_loop")
+
+[node name="ExitPath2D" type="Path2D" parent="Route" unique_id=927972183]
+curve = SubResource("Curve2D_exit")
+
+[node name="ExitIndicator" type="Polygon2D" parent="Route" unique_id=1171802549]
+visible = false
+color = Color(0.2, 0.9, 0.4, 0.9)
+polygon = PackedVector2Array(-14, 12, 14, 12, 0, -16)
+
+[node name="Queue" type="Node2D" parent="." unique_id=1168747796]
+position = Vector2(360, 900)
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=977362806]
+
+[node name="Gamepanel" parent="CanvasLayer" unique_id=1217438017 instance=ExtResource("4_pskrv")]
+
+[node name="WinPanel" parent="CanvasLayer" unique_id=1662380734 instance=ExtResource("5_gqb3i")]
+
+[node name="StartPanel" parent="CanvasLayer" unique_id=128564825 instance=ExtResource("6_yqu6c")]
+
+[node name="LosePanel" parent="CanvasLayer" unique_id=396801132 instance=ExtResource("7_wnni2")]

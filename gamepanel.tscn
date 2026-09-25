@@ -1,0 +1,85 @@
+[gd_scene format=3 uid="uid://ilte4duf1i14"]
+
+[ext_resource type="Script" uid="uid://bs0dhd4fbjv0e" path="res://gamepanel.gd" id="1_gd74s"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_uvm4r"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_uvm4r"]
+font_size = 42
+
+[sub_resource type="LabelSettings" id="LabelSettings_lvl"]
+font_size = 32
+font_color = Color(0.85, 0.9, 1, 0.8)
+
+[sub_resource type="LabelSettings" id="LabelSettings_counter"]
+font_size = 90
+font_color = Color(1, 1, 1, 0.4)
+
+[node name="Gamepanel" type="Control" unique_id=1661597568 node_paths=PackedStringArray("timer_label", "level_label", "counter_label")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_gd74s")
+timer_label = NodePath("Panel/Timer")
+level_label = NodePath("Panel/LevelTitle")
+counter_label = NodePath("Panel/Counter")
+
+[node name="Panel" type="Panel" parent="." unique_id=1385642178]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_uvm4r")
+
+[node name="Timer" type="Label" parent="Panel" unique_id=1097637155]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 40.0
+offset_right = 100.0
+offset_bottom = 100.0
+grow_horizontal = 2
+text = "00:30"
+label_settings = SubResource("LabelSettings_uvm4r")
+horizontal_alignment = 1
+
+[node name="LevelTitle" type="Label" parent="Panel" unique_id=578747775]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -150.0
+offset_top = 100.0
+offset_right = 150.0
+offset_bottom = 150.0
+grow_horizontal = 2
+text = "LEVEL 1"
+label_settings = SubResource("LabelSettings_lvl")
+horizontal_alignment = 1
+
+[node name="Counter" type="Label" parent="Panel" unique_id=1790934899]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -140.0
+offset_right = 150.0
+offset_bottom = 40.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "5"
+label_settings = SubResource("LabelSettings_counter")
+horizontal_alignment = 1
+vertical_alignment = 1

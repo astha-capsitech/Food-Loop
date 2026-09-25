@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://bopa1hoxhm8ay"]
+
+[ext_resource type="Script" uid="uid://cbip27qdu351m" path="res://Food.gd" id="1_myikp"]
+
+[node name="PathFollow2D" type="PathFollow2D"]
+rotates = false
+script = ExtResource("1_myikp")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(0.35, 0.35)
