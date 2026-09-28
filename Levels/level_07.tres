@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://bql5g8ed2bbh1"]
+
+[ext_resource type="Script" uid="uid://dmahiwhvw8t5g" path="res://ExitConfig.gd" id="1_uwuv1"]
+[ext_resource type="Script" uid="uid://cfjkkrdpu30da" path="res://LevelConfig.gd" id="2_umbwu"]
+[ext_resource type="Texture2D" uid="uid://bq46ek6us3v4k" path="res://Assets/Sprites/cube.png" id="3_fpetn"]
+
+[sub_resource type="Resource" id="Resource_websy"]
+script = ExtResource("1_uwuv1")
+exit_points = PackedVector2Array(-0.8612374, -176.55367, 0, -248.8976)
+
+[resource]
+script = ExtResource("2_umbwu")
+level_number = 7
+title = "Level 7"
+track_texture = ExtResource("3_fpetn")
+loop_points = PackedVector2Array(0, 138.65923, -54.257954, 138.65923, -84.40126, 139.52046, -118.85076, 139.52046, -148.13283, 130.90808, -173.96996, 90.429924, -173.96996, 41.339394, -177.4149, -12.918561, -173.10872, -65.45404, -160.19016, -116.267044, -143.82664, -126.6019, -119.712, -135.21426, -100.76477, -137.79799, -79.23384, -137.79799, -47.368057, -137.79799, -24.975883, -137.79799, 6.8898993, -137.79799, 43.06187, -136.0755, 86.12374, -136.0755, 124.87942, -135.21426, 147.27159, -124.01818, 162.77386, -109.37715, 173.96996, -81.81755, 173.96996, -65.45404, 177.4149, -36.17197, 175.69243, -20.669697, 175.69243, -3.4449496, 179.13737, 31.004545, 173.96996, 54.257954, 174.83119, 71.482704, 174.83119, 87.846214, 167.08005, 107.65467, 155.02274, 119.712, 142.10417, 130.04684, 120.573235, 138.65923, 81.81755, 140.3817, 42.20063, 140.3817)
+speed = 280.0
+entry_points = PackedVector2Array(5.167424, 171.81686)
+has_exit = true
+exit_configs = Array[ExtResource("1_uwuv1")]([SubResource("Resource_websy")])
+queue_fruit_indices = PackedInt32Array(6, 1, 6)
+initial_fruit_indices = PackedInt32Array(7, 1, 2, 8, 7, 3, 8)

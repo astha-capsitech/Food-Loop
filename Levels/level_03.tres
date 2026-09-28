@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://5srb074ijper"]
+
+[ext_resource type="Script" uid="uid://dmahiwhvw8t5g" path="res://ExitConfig.gd" id="1_shv5r"]
+[ext_resource type="Script" uid="uid://cfjkkrdpu30da" path="res://LevelConfig.gd" id="2_nbgdp"]
+[ext_resource type="Texture2D" uid="uid://bq46ek6us3v4k" path="res://Assets/Sprites/cube.png" id="3_b1fik"]
+
+[resource]
+script = ExtResource("2_nbgdp")
+level_number = 3
+title = "Level 3"
+track_texture = ExtResource("3_b1fik")
+loop_points = PackedVector2Array(2.3530133, 140.59254, 67.06088, 139.41605, 125.886215, 133.53351, 169.41696, 106.473854, 175.2995, 61.7666, 176.476, 12.35332, 176.476, -41.765987, 171.76997, -94.708786, 148.23984, -126.47447, 111.768135, -137.06303, 72.94341, -139.41605, 22.353626, -139.41605, -29.412666, -138.23953, -72.94341, -138.23953, -123.5332, -132.35701, -162.35793, -111.179886, -170.59348, -74.708176, -177.65251, -31.177427, -174.12299, -6.4707866, -178.82901, 26.471401, -174.12299, 75.88468, -163.53442, 113.5329, -131.76875, 133.53351, -98.82656, 139.41605, -50.589787, 141.76906)
+speed = 160.0
+entry_points = PackedVector2Array(6.5173, 173.79466)
+queue_fruit_indices = PackedInt32Array(5, 3, 6, 0, 8, 4, 9)
+initial_fruit_indices = PackedInt32Array(8, 7, 2, 1)

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://bwm6wlgj6ck3x"]
+[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://byp1xqyvb7std"]
 
 [ext_resource type="Script" uid="uid://dmahiwhvw8t5g" path="res://ExitConfig.gd" id="1_vhvcw"]
 [ext_resource type="Script" uid="uid://cfjkkrdpu30da" path="res://LevelConfig.gd" id="2_vumh6"]
@@ -9,6 +9,7 @@ script = ExtResource("2_vumh6")
 title = "Level 1"
 track_texture = ExtResource("3_vhvcw")
 loop_points = PackedVector2Array(12.079478, 138.51135, 119.98948, 144.95374, 168.30739, 115.96299, 174.74979, 70.86627, 176.36038, -75.69806, 158.64381, -119.18418, 107.104706, -140.12195, -95.83053, -140.12195, -158.64381, -119.18418, -179.58157, -80.529854, -179.58157, 80.529854, -148.98022, 125.62657, -100.662315, 140.12195)
+speed = 100.0
 entry_points = PackedVector2Array(-7.953258, 158.34215)
 queue_fruit_indices = PackedInt32Array(8, 9, 7)
 queue_count = 3
