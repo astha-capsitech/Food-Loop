@@ -15,8 +15,10 @@ const _PREVIEW_CONFIG := "res://Levels/_preview.tres"
 var current_level_index: int = 1
 var active_config: LevelConfig
 
-var queue:      Array[Food] = []
-var circulating: Array[Food] = []
+var queue:            Array[Food]  = []
+var queues:           Array[Array] = [] # Array of Array[Food]
+var queue_containers: Array[Node2D] = []
+var circulating:      Array[Food]  = []
 var player_foods_in_play: int = 0
 
 var game_started: bool = false
@@ -25,12 +27,17 @@ var level_won:   bool = false
 var level_timer: float = 30.0
 var is_timer_active: bool = false
 
-## Round-robin index into active_config.entry_points.
+## Round-robin index into active_config.entry_points (legacy fallback).
 var entry_round_robin: int = 0
 
 ## Input debounce to prevent dual touch/mouse events on mobile
 const TAP_COOLDOWN: float = 0.15
 var last_tap_time: float = -999.0
+
+## Dynamically created Line2D nodes for each EntryConfig (parallel arrays).
+var entry_road_nodes: Array[Line2D] = []
+var entry_dash_nodes: Array[Line2D] = []
+var entry_progs:      Array[float]  = []
 
 ## Dynamically created Path2D nodes for each ExitConfig (parallel arrays).
 var exit_path_nodes: Array[Path2D] = []
@@ -125,11 +132,13 @@ func _clear_level_state() -> void:
 		if is_instance_valid(f): f.queue_free()
 	circulating.clear()
 
-	for f: Food in queue:
-		if is_instance_valid(f): f.queue_free()
+	for q: Array in queues:
+		for f: Food in q:
+			if is_instance_valid(f): f.queue_free()
+	queues.clear()
 	queue.clear()
 
-	# Clear any foods still attached to loop_path, exit_path or queue_container
+	# Clear any foods still attached to loop_path, exit_path or queue_containers
 	if is_instance_valid(loop_path):
 		for c in loop_path.get_children():
 			if c is Food and is_instance_valid(c):
@@ -140,10 +149,33 @@ func _clear_level_state() -> void:
 			if c is Food and is_instance_valid(c):
 				c.queue_free()
 
-	if is_instance_valid(queue_container):
-		for c in queue_container.get_children():
-			if c is Food and is_instance_valid(c):
-				c.queue_free()
+	for qc in queue_containers:
+		if is_instance_valid(qc):
+			for c in qc.get_children():
+				if c is Food and is_instance_valid(c):
+					c.queue_free()
+
+	# Destroy dynamically created extra queue containers (index > 0; index 0 = reused scene node)
+	for i: int in range(1, queue_containers.size()):
+		var qc: Node2D = queue_containers[i]
+		if is_instance_valid(qc):
+			qc.queue_free()
+	queue_containers.clear()
+
+	# Destroy dynamically created extra entry roads and dashes (index > 0)
+	for i: int in range(1, entry_road_nodes.size()):
+		var er: Line2D = entry_road_nodes[i]
+		if is_instance_valid(er):
+			er.queue_free()
+	entry_road_nodes.clear()
+
+	for i: int in range(1, entry_dash_nodes.size()):
+		var ed: Line2D = entry_dash_nodes[i]
+		if is_instance_valid(ed):
+			ed.queue_free()
+	entry_dash_nodes.clear()
+
+	entry_progs.clear()
 
 	# Destroy dynamically created extra exit paths (index > 0; index 0 = reused scene node)
 	for i: int in range(1, exit_path_nodes.size()):
@@ -184,16 +216,8 @@ func _apply_config() -> void:
 	# ── 3. Build loop curve ──────────────────────────────────────────────────────
 	loop_path.curve = active_config.get_loop_curve()
 
-	# ── 4. Anchor queue to entry point (in LevelRoot space) ───────────────────
-	if not active_config.entry_points.is_empty():
-		queue_container.position = active_config.entry_points[0] * active_config.route_scale
-	else:
-		var q_rel: Vector2 = active_config.queue_base_position - active_config.route_position
-		queue_container.position = q_rel
-	queue_container.rotation = 0.0
-
-	# ── 5. Auto-generate Entry Road visual along the queue direction ────────────
-	_rebuild_entry_road()
+	# ── 4. Setup entry points, entry roads, and queue containers ──────────────
+	_setup_entries_and_queues()
 
 	# ── 6. Setup exit paths ─────────────────────────────────────────────────────
 	if active_config.has_exit and not active_config.exit_configs.is_empty():
@@ -303,19 +327,76 @@ func _apply_responsive_layout() -> void:
 	level_root.position.y = vp_size.y * (authored_y / DESIGN_H)
 
 
-## Entry road extends from entry_local outward along the queue direction (matching queue_step).
+# ─── Entry points & Queues setup ─────────────────────────────────────────────
+
+func _setup_entries_and_queues() -> void:
+	entry_progs.clear()
+	var e_configs := active_config.get_entry_configs()
+	var count: int = e_configs.size()
+
+	for i: int in range(count):
+		var ec: EntryConfig = e_configs[i]
+		entry_progs.append(active_config.get_entry_progress(loop_path.curve, i))
+
+		# Queue Container Node
+		var qc_node: Node2D
+		if i == 0:
+			qc_node = queue_container
+		else:
+			qc_node = Node2D.new()
+			qc_node.name = "Queue_%d" % i
+			level_root.add_child(qc_node)
+
+		qc_node.position = ec.entry_point * active_config.route_scale
+		qc_node.rotation = 0.0
+		queue_containers.append(qc_node)
+
+		# Entry Road Visuals (Line2D)
+		var road_node: Line2D
+		var dash_node: Line2D
+		if i == 0:
+			road_node = entry_road
+			dash_node = entry_dashes
+		else:
+			road_node = Line2D.new()
+			road_node.width = entry_road.width
+			road_node.default_color = entry_road.default_color
+			road_node.joint_mode = entry_road.joint_mode
+			route.add_child(road_node)
+
+			dash_node = Line2D.new()
+			dash_node.width = entry_dashes.width
+			dash_node.default_color = entry_dashes.default_color
+			dash_node.joint_mode = entry_dashes.joint_mode
+			route.add_child(dash_node)
+
+		entry_road_nodes.append(road_node)
+		entry_dash_nodes.append(dash_node)
+
+		_build_single_entry_road(road_node, dash_node, ec)
+
+
+func _build_single_entry_road(road: Line2D, dashes: Line2D, ec: EntryConfig) -> void:
+	road.clear_points()
+	dashes.clear_points()
+	var entry_local: Vector2 = ec.entry_point
+	var step_dir: Vector2 = ec.queue_step.normalized()
+	if step_dir.length_squared() < 0.01:
+		step_dir = Vector2.DOWN
+	var far_local: Vector2 = entry_local + step_dir * 3000.0
+
+	road.add_point(entry_local)
+	road.add_point(far_local)
+	_add_dashes(dashes, entry_local, far_local)
+
+
+## Rebuilds all entry roads according to current active_config entry configs.
 func _rebuild_entry_road() -> void:
-	entry_road.clear_points()
-	entry_dashes.clear_points()
-	if active_config.entry_points.is_empty():
+	if not active_config:
 		return
-
-	var entry_local: Vector2 = active_config.entry_points[0]
-	var far_local: Vector2 = entry_local + Vector2.DOWN * 3000.0
-
-	entry_road.add_point(entry_local)
-	entry_road.add_point(far_local)
-	_add_dashes(entry_dashes, entry_local, far_local)
+	var e_configs := active_config.get_entry_configs()
+	for i in range(mini(e_configs.size(), entry_road_nodes.size())):
+		_build_single_entry_road(entry_road_nodes[i], entry_dash_nodes[i], e_configs[i])
 
 
 func _clear_exit_road() -> void:
@@ -406,88 +487,163 @@ func spawn_initial_circulating() -> void:
 
 
 func spawn_queue() -> void:
-	var count: int   = active_config.queue_count
-	var indices      := active_config.queue_fruit_indices
-	for i: int in range(count):
-		var f: Food = food_scene.instantiate() as Food
-		queue_container.add_child(f)
-		var f_idx: int = 0
-		var tex: AtlasTexture
-		if active_config.queue_random_fruit:
-			f_idx = randi() % FoodTextures.get_total_fruit_types()
-			tex = FoodTextures.get_fruit_texture(f_idx)
-		elif indices.size() > 0:
-			f_idx = indices[i % indices.size()]
-			tex = FoodTextures.get_fruit_texture(f_idx)
-		else:
-			f_idx = 0
-			tex = FoodTextures.get_fruit_texture(0)
-		f.setup_fruit(tex, true, active_config.speed, f_idx)
-		f.position = active_config.queue_step * float(i)
-		queue.append(f)
+	queues.clear()
+	var e_configs := active_config.get_entry_configs()
+	for qi: int in range(e_configs.size()):
+		var ec: EntryConfig = e_configs[qi]
+		if qi >= queue_containers.size():
+			continue
+		var qc_node: Node2D = queue_containers[qi]
+		var q_list: Array[Food] = []
+
+		var count: int = ec.queue_count
+		var indices := ec.queue_fruit_indices
+		for slot: int in range(count):
+			var f: Food = food_scene.instantiate() as Food
+			qc_node.add_child(f)
+			var f_idx: int = 0
+			var tex: AtlasTexture
+			if ec.queue_random_fruit:
+				f_idx = randi() % FoodTextures.get_total_fruit_types()
+				tex = FoodTextures.get_fruit_texture(f_idx)
+			elif indices.size() > 0:
+				f_idx = indices[slot % indices.size()]
+				tex = FoodTextures.get_fruit_texture(f_idx)
+			else:
+				f_idx = 0
+				tex = FoodTextures.get_fruit_texture(0)
+			f.setup_fruit(tex, true, active_config.speed, f_idx)
+			f.position = ec.queue_step * float(slot)
+			q_list.append(f)
+		queues.append(q_list)
+
+	queue = queues[0] if not queues.is_empty() else []
 
 
 # ─── Input ────────────────────────────────────────────────────────────────────
 
+## Identifies which Entry / Queue was clicked by checking distance from tap_pos
+## to each Entry Point, its active queue foods, and its entry road.
+## Returns -1 if tap is outside all valid interaction areas.
+func _find_clicked_queue(tap_pos: Vector2) -> int:
+	var e_configs := active_config.get_entry_configs()
+	var best_idx: int = -1
+	var min_distance: float = INF
+
+	# Scale touch radius with screen size
+	var hit_threshold: float = 65.0 * maxf(level_root.scale.x, 0.7)
+
+	for i: int in range(queues.size()):
+		if i >= e_configs.size() or i >= queue_containers.size():
+			continue
+
+		# If this queue is completely empty, it does not respond to clicks
+		if queues[i].is_empty():
+			continue
+
+		var ec: EntryConfig = e_configs[i]
+
+		# 1. Distance to entry point on track
+		var ep_global: Vector2 = route.to_global(ec.entry_point)
+		var queue_dist: float = tap_pos.distance_to(ep_global)
+
+		# 2. Distance to each active food in this queue
+		for f: Food in queues[i]:
+			if is_instance_valid(f):
+				var f_dist: float = tap_pos.distance_to(f.global_position)
+				if f_dist < queue_dist:
+					queue_dist = f_dist
+
+		# 3. Distance to the entry road line segment
+		var step_dir := ec.queue_step
+		if step_dir.length_squared() < 0.01:
+			step_dir = Vector2(0, 44)
+		var tail_local: Vector2 = ec.entry_point + step_dir * float(maxi(1, ec.queue_count))
+		var tail_global: Vector2 = route.to_global(tail_local)
+		var closest_pt: Vector2 = Geometry2D.get_closest_point_to_segment(tap_pos, ep_global, tail_global)
+		var dist_to_segment: float = tap_pos.distance_to(closest_pt)
+		if dist_to_segment < queue_dist:
+			queue_dist = dist_to_segment
+
+		if queue_dist < hit_threshold and queue_dist < min_distance:
+			min_distance = queue_dist
+			best_idx = i
+
+	return best_idx
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not game_started or game_over or level_won:
 		return
-	
+
 	var is_valid_tap: bool = false
+	var tap_pos: Vector2 = Vector2.ZERO
 	if event is InputEventScreenTouch:
 		var touch_ev := event as InputEventScreenTouch
 		if touch_ev.pressed:
 			is_valid_tap = true
+			tap_pos = touch_ev.position
 	elif event is InputEventMouseButton:
 		var mouse_ev := event as InputEventMouseButton
 		if mouse_ev.pressed and mouse_ev.button_index == MOUSE_BUTTON_LEFT:
 			is_valid_tap = true
-	
+			tap_pos = mouse_ev.position
+
 	if is_valid_tap:
 		var current_time: float = Time.get_ticks_msec() / 1000.0
 		if current_time - last_tap_time < TAP_COOLDOWN:
 			return
+
+		var target_queue_idx: int = _find_clicked_queue(tap_pos)
+		if target_queue_idx < 0:
+			# Clicked outside of any entry path, queue, or entry point -> ignore tap
+			return
+
 		last_tap_time = current_time
 		get_viewport().set_input_as_handled()
-		enter_next_food()
+		enter_food_from_queue(target_queue_idx)
 
 
-func enter_next_food() -> void:
-	if queue.is_empty() or game_over or level_won:
+func enter_food_from_queue(queue_idx: int) -> void:
+	if queue_idx < 0 or queue_idx >= queues.size():
+		return
+	if queues[queue_idx].is_empty() or game_over or level_won:
 		return
 
-	var colliding_food: Food = get_colliding_food_at_entry()
+	var colliding_food: Food = get_colliding_food_at_entry(queue_idx)
+	var entry_prog: float = entry_progs[queue_idx] if queue_idx < entry_progs.size() else 0.0
 
-	# Determine which entry point to use (round-robin)
-	var current_entry_idx: int = entry_round_robin
-	var entry_prog: float = active_config.get_entry_progress(
-		loop_path.curve, current_entry_idx)
-	entry_round_robin = (entry_round_robin + 1) % maxi(1, active_config.entry_points.size())
-
-	var f: Food = queue.pop_front() as Food
-	f.entry_index = current_entry_idx
+	var f: Food = queues[queue_idx].pop_front() as Food
+	queue = queues[0] if not queues.is_empty() else []
+	f.entry_index = queue_idx
 	f.reparent(loop_path, false)
 	f.start_circulating(entry_prog)
 	circulating.append(f)
 	player_foods_in_play += 1
 
-	shift_queue()
+	shift_queue(queue_idx)
 	update_counter()
 
-	# If there was a fruit at the entry point, play collision animation then game over
+	# If there was a fruit at this entry point, play collision animation then game over
 	if colliding_food != null:
 		trigger_collision_game_over(f, colliding_food)
 		return
 
-	# No-exit levels win when the queue is fully sent
-	if not active_config.has_exit and queue.is_empty():
+	# No-exit levels win when all queues are fully sent
+	if not active_config.has_exit and are_all_queues_empty():
 		trigger_win()
 
 
-func get_colliding_food_at_entry() -> Food:
+func enter_next_food() -> void:
+	for i in range(queues.size()):
+		if not queues[i].is_empty():
+			enter_food_from_queue(i)
+			return
+
+
+func get_colliding_food_at_entry(entry_idx: int = 0) -> Food:
 	var curve_len: float  = loop_path.curve.get_baked_length()
-	var entry_prog: float = active_config.get_entry_progress(
-		loop_path.curve, entry_round_robin)
+	var entry_prog: float = entry_progs[entry_idx] if entry_idx < entry_progs.size() else active_config.get_entry_progress(loop_path.curve, entry_idx)
 	for f: Food in circulating:
 		if not is_instance_valid(f) or f.state != Food.State.CIRCULATING:
 			continue
@@ -501,16 +657,30 @@ func get_colliding_food_at_entry() -> Food:
 	return null
 
 
-func check_collision_at_entry() -> bool:
-	return get_colliding_food_at_entry() != null
+func check_collision_at_entry(entry_idx: int = 0) -> bool:
+	return get_colliding_food_at_entry(entry_idx) != null
 
 
-func shift_queue() -> void:
-	for i: int in range(queue.size()):
-		var target_pos: Vector2 = active_config.queue_step * float(i)
+func shift_queue(queue_idx: int = 0) -> void:
+	if queue_idx < 0 or queue_idx >= queues.size():
+		return
+	var e_configs := active_config.get_entry_configs()
+	var step: Vector2 = e_configs[queue_idx].queue_step if queue_idx < e_configs.size() else active_config.queue_step
+	var q: Array = queues[queue_idx]
+	for i: int in range(q.size()):
+		var target_pos: Vector2 = step * float(i)
 		var tw: Tween = create_tween()
-		tw.tween_property(queue[i], "position", target_pos, 0.12) \
+		tw.tween_property(q[i], "position", target_pos, 0.12) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func are_all_queues_empty() -> bool:
+	if queues.is_empty():
+		return queue.is_empty()
+	for q: Array in queues:
+		if not q.is_empty():
+			return false
+	return true
 
 
 # ─── Process / Exit logic ─────────────────────────────────────────────────────
@@ -577,14 +747,19 @@ func _can_food_use_exit(f: Food, exit_idx: int) -> bool:
 func _on_food_exited(_food: Food) -> void:
 	player_foods_in_play = maxi(0, player_foods_in_play - 1)
 	update_counter()
-	if active_config.has_exit and queue.is_empty() and player_foods_in_play == 0:
+	if active_config.has_exit and are_all_queues_empty() and player_foods_in_play == 0:
 		trigger_win()
 
 
 # ─── UI helpers ──────────────────────────────────────────────────────────────
 
 func update_counter() -> void:
-	var rem: int = queue.size()
+	var rem: int = 0
+	if not queues.is_empty():
+		for q: Array in queues:
+			rem += q.size()
+	else:
+		rem = queue.size()
 	if active_config and active_config.has_exit:
 		rem += player_foods_in_play
 	gamepanel.set_counter(rem)

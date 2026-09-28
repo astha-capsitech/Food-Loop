@@ -42,6 +42,7 @@ var current_file_path: String   = ""
 var is_dirty: bool              = false
 
 var edit_mode: EditMode = EditMode.LOOP
+var current_entry_idx: int = 0
 var current_exit_idx: int = 0
 
 # Canvas view
@@ -77,6 +78,8 @@ var queue_count_spin: SpinBox
 var has_exit_check: CheckBox
 var speed_spin: SpinBox
 var gap_spin: SpinBox
+var entry_select: OptionButton
+var entry_label_edit: LineEdit
 var exit_select: OptionButton
 var exit_label_edit: LineEdit
 var rule_select: OptionButton
@@ -94,6 +97,7 @@ var queue_pos_y: SpinBox
 var queue_step_x: SpinBox
 var queue_step_y: SpinBox
 var selected_is_queue: bool = false
+var selected_queue_idx: int = -1
 var file_dialog: EditorFileDialog
 var confirm_dialog: ConfirmationDialog
 var _pending_delete_path: String = ""
@@ -334,6 +338,48 @@ func _build_entry_settings(parent: Control) -> void:
 	entry_settings_box.add_theme_constant_override("separation", 4)
 	parent.add_child(entry_settings_box)
 
+	var row0 := HBoxContainer.new()
+	row0.add_theme_constant_override("separation", 6)
+	entry_settings_box.add_child(row0)
+
+	row0.add_child(_make_label("Entry:"))
+	entry_select = OptionButton.new()
+	entry_select.custom_minimum_size = Vector2(90, 0)
+	entry_select.item_selected.connect(func(idx: int) -> void:
+		current_entry_idx = idx
+		_sync_entry_ui_from_current()
+		_update_canvas()
+	)
+	row0.add_child(entry_select)
+
+	var add_entry_btn := Button.new()
+	add_entry_btn.text = "+"
+	add_entry_btn.custom_minimum_size = Vector2(28, 0)
+	add_entry_btn.pressed.connect(_add_entry_config)
+	row0.add_child(add_entry_btn)
+
+	var del_entry_btn := Button.new()
+	del_entry_btn.text = "×"
+	del_entry_btn.custom_minimum_size = Vector2(28, 0)
+	del_entry_btn.pressed.connect(_delete_entry_config)
+	row0.add_child(del_entry_btn)
+
+	row0.add_child(_make_label("  Label:"))
+	entry_label_edit = LineEdit.new()
+	entry_label_edit.custom_minimum_size = Vector2(80, 0)
+	entry_label_edit.text_changed.connect(func(t: String) -> void:
+		_get_current_entry_cfg_safe(func(c: EntryConfig) -> void:
+			c.label = t
+			_mark_dirty()
+		)
+	)
+	row0.add_child(entry_label_edit)
+
+	var align_btn := Button.new()
+	align_btn.text = "🎯 Align to Entry"
+	align_btn.pressed.connect(_auto_align_queue_to_entry)
+	row0.add_child(align_btn)
+
 	var row1 := HBoxContainer.new()
 	row1.add_theme_constant_override("separation", 6)
 	entry_settings_box.add_child(row1)
@@ -341,48 +387,47 @@ func _build_entry_settings(parent: Control) -> void:
 	row1.add_child(_make_label("Queue Pos:"))
 	queue_pos_x = _make_spinbox(-3000.0, 3000.0, 1.0, 360.0, 55.0)
 	queue_pos_x.value_changed.connect(func(v: float) -> void:
-		if current_config:
-			current_config.queue_base_position.x = v
+		_get_current_entry_cfg_safe(func(c: EntryConfig) -> void:
+			c.queue_base_position.x = v
 			_mark_dirty()
 			_update_canvas()
+		)
 	)
 	row1.add_child(queue_pos_x)
 
 	queue_pos_y = _make_spinbox(-3000.0, 3000.0, 1.0, 950.0, 55.0)
 	queue_pos_y.value_changed.connect(func(v: float) -> void:
-		if current_config:
-			current_config.queue_base_position.y = v
+		_get_current_entry_cfg_safe(func(c: EntryConfig) -> void:
+			c.queue_base_position.y = v
 			_mark_dirty()
 			_update_canvas()
+		)
 	)
 	row1.add_child(queue_pos_y)
 
 	row1.add_child(_make_label("  Step:"))
 	queue_step_x = _make_spinbox(-500.0, 500.0, 1.0, 0.0, 45.0)
 	queue_step_x.value_changed.connect(func(v: float) -> void:
-		if current_config:
-			current_config.queue_step.x = v
+		_get_current_entry_cfg_safe(func(c: EntryConfig) -> void:
+			c.queue_step.x = v
 			_mark_dirty()
 			_update_canvas()
+		)
 	)
 	row1.add_child(queue_step_x)
 
 	queue_step_y = _make_spinbox(-500.0, 500.0, 1.0, 44.0, 45.0)
 	queue_step_y.value_changed.connect(func(v: float) -> void:
-		if current_config:
-			current_config.queue_step.y = v
+		_get_current_entry_cfg_safe(func(c: EntryConfig) -> void:
+			c.queue_step.y = v
 			_mark_dirty()
 			_update_canvas()
+		)
 	)
 	row1.add_child(queue_step_y)
 
-	var align_btn := Button.new()
-	align_btn.text = "🎯 Align to Entry"
-	align_btn.pressed.connect(_auto_align_queue_to_entry)
-	row1.add_child(align_btn)
-
 	var lbl := Label.new()
-	lbl.text = "Entry: Click to place Entry points. Drag the 🔵 [Q] circle on canvas to position the Queue."
+	lbl.text = "Entry mode: Click canvas to add/move Entry points. Drag 🔵 [Q] on canvas to position the Queue."
 	lbl.add_theme_color_override("font_color", Color(1.0, 0.7, 0.3))
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	entry_settings_box.add_child(lbl)
@@ -483,14 +528,27 @@ func _build_right_panel(parent: Control) -> void:
 	vb.add_child(ql_bar)
 	ql_bar.add_child(_make_label("Queue  Count:"))
 	queue_count_spin = _make_spinbox(1.0, 30.0, 1.0, 6.0, 45.0)
-	queue_count_spin.value_changed.connect(func(v): if current_config: current_config.queue_count = int(v); _mark_dirty())
+	queue_count_spin.value_changed.connect(func(v: float) -> void:
+		_get_current_entry_cfg_safe(func(c: EntryConfig) -> void:
+			c.queue_count = int(v)
+			_sync_legacy_queue_fields()
+			_mark_dirty()
+			_update_canvas()
+		)
+	)
 	ql_bar.add_child(queue_count_spin)
 
 	var rand_bar := HBoxContainer.new()
 	vb.add_child(rand_bar)
 	randomize_check = CheckBox.new()
 	randomize_check.text = "Randomize queue"
-	randomize_check.toggled.connect(_on_randomize_toggled)
+	randomize_check.toggled.connect(func(on: bool) -> void:
+		_get_current_entry_cfg_safe(func(c: EntryConfig) -> void:
+			c.queue_random_fruit = on
+			_sync_legacy_queue_fields()
+			_mark_dirty()
+		)
+	)
 	rand_bar.add_child(randomize_check)
 
 	var q_scroll := ScrollContainer.new()
@@ -656,12 +714,11 @@ func _on_delete_confirmed() -> void:
 func _sync_ui_from_config() -> void:
 	if not current_config:
 		return
+	_ensure_entry_configs()
 	_block_signals(true)
 	timer_spin.value      = current_config.level_time
 	speed_spin.value      = current_config.speed
 	gap_spin.value        = current_config.min_gap
-	randomize_check.button_pressed = current_config.queue_random_fruit
-	queue_count_spin.value = float(current_config.queue_count)
 	has_exit_check.button_pressed  = current_config.has_exit
 	route_pos_x.value   = current_config.route_position.x
 	route_pos_y.value   = current_config.route_position.y
@@ -669,19 +726,14 @@ func _sync_ui_from_config() -> void:
 	route_scale_y.value = current_config.route_scale.y
 	current_config.route_rotation = 0.0
 
-	if is_instance_valid(queue_pos_x): queue_pos_x.value = current_config.queue_base_position.x
-	if is_instance_valid(queue_pos_y): queue_pos_y.value = current_config.queue_base_position.y
-	if is_instance_valid(queue_step_x): queue_step_x.value = current_config.queue_step.x
-	if is_instance_valid(queue_step_y): queue_step_y.value = current_config.queue_step.y
-
 	if current_config.track_texture and current_config.track_texture.resource_path:
 		sprite_name_lbl.text = current_config.track_texture.resource_path.get_file()
 	else:
 		sprite_name_lbl.text = "(none)"
 
 	_block_signals(false)
+	_refresh_entry_select()
 	_refresh_exit_select()
-	_refresh_queue_display()
 	_refresh_initial_display()
 	_update_mode_settings_visibility()
 
@@ -696,17 +748,137 @@ func _block_signals(blocked: bool) -> void:
 			node.set_block_signals(blocked)
 
 
+func _ensure_entry_configs() -> void:
+	if not current_config:
+		return
+	if current_config.entry_configs.is_empty():
+		current_config.entry_configs = current_config.get_entry_configs().duplicate(true)
+
+
+func _get_current_entry_cfg() -> EntryConfig:
+	if not current_config:
+		return null
+	_ensure_entry_configs()
+	if current_config.entry_configs.is_empty():
+		return null
+	current_entry_idx = clampi(current_entry_idx, 0, current_config.entry_configs.size() - 1)
+	return current_config.entry_configs[current_entry_idx]
+
+
+func _get_current_entry_cfg_safe(cb: Callable) -> void:
+	var ec := _get_current_entry_cfg()
+	if ec:
+		cb.call(ec)
+		_sync_legacy_queue_fields()
+		_mark_dirty()
+
+
+func _refresh_entry_select() -> void:
+	if not is_instance_valid(entry_select):
+		return
+	entry_select.clear()
+	if not current_config:
+		return
+	_ensure_entry_configs()
+	for i in range(current_config.entry_configs.size()):
+		entry_select.add_item(current_config.entry_configs[i].label, i)
+	if current_config.entry_configs.is_empty():
+		if is_instance_valid(entry_label_edit): entry_label_edit.text = ""
+	else:
+		current_entry_idx = clampi(current_entry_idx, 0, current_config.entry_configs.size() - 1)
+		entry_select.select(current_entry_idx)
+		if is_instance_valid(entry_label_edit):
+			entry_label_edit.text = current_config.entry_configs[current_entry_idx].label
+	_sync_entry_ui_from_current()
+
+
+func _sync_entry_ui_from_current() -> void:
+	var ec := _get_current_entry_cfg()
+	if not ec:
+		return
+	_block_signals(true)
+	if is_instance_valid(entry_label_edit):
+		entry_label_edit.text = ec.label
+	if is_instance_valid(queue_pos_x):
+		queue_pos_x.value = ec.queue_base_position.x
+	if is_instance_valid(queue_pos_y):
+		queue_pos_y.value = ec.queue_base_position.y
+	if is_instance_valid(queue_step_x):
+		queue_step_x.value = ec.queue_step.x
+	if is_instance_valid(queue_step_y):
+		queue_step_y.value = ec.queue_step.y
+	if is_instance_valid(queue_count_spin):
+		queue_count_spin.value = float(ec.queue_count)
+	if is_instance_valid(randomize_check):
+		randomize_check.button_pressed = ec.queue_random_fruit
+	_block_signals(false)
+	_refresh_queue_display()
+
+
+func _add_entry_config() -> void:
+	if not current_config:
+		return
+	_ensure_entry_configs()
+	var idx := current_config.entry_configs.size()
+	var ec := EntryConfig.new()
+	ec.label = "Entry %d" % (idx + 1)
+	ec.entry_point = Vector2(0.0, 105.0) if idx == 0 else Vector2(randf_range(-100.0, 100.0), randf_range(-100.0, 100.0))
+	ec.queue_step = Vector2(0.0, 44.0)
+	ec.queue_base_position = ec.entry_point + ec.queue_step
+	ec.queue_count = 6
+	ec.queue_fruit_indices = PackedInt32Array([0, 1, 2, 3])
+	ec.queue_random_fruit = false
+	current_config.entry_configs.append(ec)
+	current_entry_idx = current_config.entry_configs.size() - 1
+	_sync_legacy_queue_fields()
+	_refresh_entry_select()
+	_mark_dirty()
+	_update_canvas()
+
+
+func _delete_entry_config() -> void:
+	if not current_config:
+		return
+	_ensure_entry_configs()
+	if current_config.entry_configs.size() <= 1:
+		push_warning("Level Builder: Cannot delete the only entry point.")
+		return
+	current_config.entry_configs.remove_at(current_entry_idx)
+	current_entry_idx = clampi(current_entry_idx - 1, 0, current_config.entry_configs.size() - 1)
+	_sync_legacy_queue_fields()
+	_refresh_entry_select()
+	_mark_dirty()
+	_update_canvas()
+
+
+func _sync_legacy_queue_fields() -> void:
+	if not current_config:
+		return
+	var eps := PackedVector2Array()
+	for ec in current_config.entry_configs:
+		eps.append(ec.entry_point)
+	current_config.entry_points = eps
+	if not current_config.entry_configs.is_empty():
+		var first: EntryConfig = current_config.entry_configs[0]
+		current_config.queue_count = first.queue_count
+		current_config.queue_fruit_indices = first.queue_fruit_indices
+		current_config.queue_random_fruit = first.queue_random_fruit
+		current_config.queue_step = first.queue_step
+		current_config.queue_base_position = current_config.route_position + first.queue_base_position
+
+
 func _auto_align_queue_to_entry() -> void:
 	if not current_config:
 		return
-	if current_config.entry_points.is_empty():
+	var ec := _get_current_entry_cfg()
+	if not ec:
 		return
-	var ep0: Vector2 = current_config.entry_points[0]
-	var step_offset := current_config.queue_step
+	var step_offset := ec.queue_step
 	if step_offset.length_squared() < 0.001:
 		step_offset = Vector2(0.0, 44.0)
-	current_config.queue_base_position = current_config.route_position + ep0 + step_offset
-	_sync_ui_from_config()
+	ec.queue_base_position = ec.entry_point + step_offset
+	_sync_entry_ui_from_current()
+	_sync_legacy_queue_fields()
 	_mark_dirty()
 	_update_canvas()
 
@@ -884,10 +1056,13 @@ func _on_fruit_picked(idx: int) -> void:
 	if not current_config:
 		return
 	if fruit_target == "queue":
-		var arr := PackedInt32Array(current_config.queue_fruit_indices)
-		arr.append(idx)
-		current_config.queue_fruit_indices = arr
-		_refresh_queue_display()
+		var ec := _get_current_entry_cfg()
+		if ec:
+			var arr := PackedInt32Array(ec.queue_fruit_indices)
+			arr.append(idx)
+			ec.queue_fruit_indices = arr
+			_sync_legacy_queue_fields()
+			_refresh_queue_display()
 	else:
 		var arr := PackedInt32Array(current_config.initial_fruit_indices)
 		arr.append(idx)
@@ -910,19 +1085,27 @@ func _refresh_queue_display() -> void:
 		c.queue_free()
 	if not current_config or not _get_sheet():
 		return
-	for i in range(current_config.queue_fruit_indices.size()):
-		var fi := current_config.queue_fruit_indices[i]
+	var ec := _get_current_entry_cfg()
+	if not ec:
+		return
+	for i in range(ec.queue_fruit_indices.size()):
+		var fi := ec.queue_fruit_indices[i]
 		queue_flow.add_child(_make_item_chip(fi, func(): _remove_queue_item(i)))
 
 
 func _remove_queue_item(i: int) -> void:
 	if not current_config:
 		return
-	var arr := PackedInt32Array(current_config.queue_fruit_indices)
-	arr.remove_at(i)
-	current_config.queue_fruit_indices = arr
-	_refresh_queue_display()
-	_mark_dirty()
+	var ec := _get_current_entry_cfg()
+	if not ec:
+		return
+	var arr := PackedInt32Array(ec.queue_fruit_indices)
+	if i < arr.size():
+		arr.remove_at(i)
+		ec.queue_fruit_indices = arr
+		_sync_legacy_queue_fields()
+		_refresh_queue_display()
+		_mark_dirty()
 
 
 func _refresh_initial_display() -> void:
@@ -960,6 +1143,8 @@ func _on_play() -> void:
 	if not current_config:
 		push_warning("Level Builder: No level loaded. Create or open a level first.")
 		return
+	_ensure_entry_configs()
+	_sync_legacy_queue_fields()
 	_ensure_levels_dir()
 	var err := ResourceSaver.save(current_config, _PREVIEW_TRES)
 	if err != OK:
@@ -976,6 +1161,8 @@ func _on_play() -> void:
 func _on_save() -> void:
 	if not current_config:
 		return
+	_ensure_entry_configs()
+	_sync_legacy_queue_fields()
 	if current_file_path.is_empty():
 		current_file_path = "%s/level_%02d.tres" % [_LEVELS_DIR, current_config.level_number]
 	_ensure_levels_dir()
@@ -1074,23 +1261,70 @@ func on_canvas_draw(canvas: Control) -> void:
 			canvas.draw_string(ThemeDB.fallback_font, cp + Vector2(7, -4),
 				"[0]", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.8, 1, 0.4, 0.8))
 
-	# Entry points
-	for i in range(current_config.entry_points.size()):
-		var ep := _world_to_canvas(current_config.entry_points[i], canvas)
-		var selected := (edit_mode == EditMode.ENTRY and i == selected_idx)
-		# Triangle arrow pointing right (entry marker)
-		var tri := PackedVector2Array([
-			ep + Vector2(-8, -9), ep + Vector2(-8, 9), ep + Vector2(10, 0)
-		])
-		canvas.draw_polygon(tri,
-			[Color(1.0, 0.6, 0.0) if not selected else Color.YELLOW,
-			 Color(1.0, 0.6, 0.0) if not selected else Color.YELLOW,
-			 Color(1.0, 0.6, 0.0) if not selected else Color.YELLOW])
-		canvas.draw_string(ThemeDB.fallback_font, ep + Vector2(13, -4),
-			"E%d" % i, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1.0, 0.7, 0.3))
+	# Entry points, approach paths, and Queues
+	if current_config:
+		_ensure_entry_configs()
+		var e_configs := current_config.get_entry_configs()
+		var sheet := _get_sheet()
+
+		for i in range(e_configs.size()):
+			var ec: EntryConfig = e_configs[i]
+			var is_current: bool = (edit_mode == EditMode.ENTRY and i == current_entry_idx)
+			var ep_canvas := _world_to_canvas(ec.entry_point, canvas)
+
+			# 1. Approach path / Entry Road
+			var step_dir := ec.queue_step
+			if step_dir.length_squared() < 0.01:
+				step_dir = Vector2(0, 44)
+			var tail_world: Vector2 = ec.entry_point + step_dir * float(maxi(1, ec.queue_count))
+			var tail_canvas := _world_to_canvas(tail_world, canvas)
+			var road_col := Color(0.2, 0.7, 1.0, 0.35) if is_current else Color(0.2, 0.45, 0.65, 0.18)
+			canvas.draw_line(ep_canvas, tail_canvas, road_col, 8.0 * canvas_zoom)
+
+			# 2. Entry marker (triangle)
+			var tri := PackedVector2Array([
+				ep_canvas + Vector2(-8, -9), ep_canvas + Vector2(-8, 9), ep_canvas + Vector2(10, 0)
+			])
+			var ep_col := Color.YELLOW if (is_current and selected_idx == i and not selected_is_queue) else (Color(1.0, 0.8, 0.2) if is_current else Color(1.0, 0.55, 0.0))
+			canvas.draw_polygon(tri, [ep_col, ep_col, ep_col])
+			canvas.draw_string(ThemeDB.fallback_font, ep_canvas + Vector2(13, -4),
+				"E%d" % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ep_col)
+
+			# 3. Queue Slots & Foods
+			var q_count: int = ec.queue_count
+			var q_indices := ec.queue_fruit_indices
+			var q_base_canvas := _world_to_canvas(ec.queue_base_position, canvas)
+
+			if q_count > 1:
+				var p_last_canvas := q_base_canvas + ec.queue_step * canvas_zoom * float(q_count - 1)
+				canvas.draw_line(q_base_canvas, p_last_canvas, Color(0.2, 0.7, 1.0, 0.5 if is_current else 0.25), 2.0)
+
+			for qi in range(q_count):
+				var slot_canvas: Vector2 = q_base_canvas + ec.queue_step * canvas_zoom * float(qi)
+				var fruit_idx: int = 0
+				if q_indices.size() > 0:
+					fruit_idx = q_indices[qi % q_indices.size()]
+
+				var is_first: bool = (qi == 0)
+				var q_radius: float = clampf(14.0 * canvas_zoom, 7.0, 18.0)
+				var is_q_selected: bool = (selected_is_queue and selected_queue_idx == i and is_first)
+
+				var bg_col := Color.YELLOW if is_q_selected else (Color(0.2, 0.8, 1.0, 0.95) if (is_first and is_current) else (Color(0.2, 0.6, 1.0, 0.7) if is_first else Color(0.15, 0.35, 0.65, 0.5)))
+				canvas.draw_circle(slot_canvas, q_radius + 2.0, bg_col)
+
+				if sheet and fruit_idx >= 0 and fruit_idx < _FRUIT_REGIONS.size():
+					var f_rect: Rect2 = _FRUIT_REGIONS[fruit_idx] as Rect2
+					var draw_sz := (q_radius * 2.0)
+					var dest_rect := Rect2(slot_canvas - Vector2(draw_sz * 0.5, draw_sz * 0.5), Vector2(draw_sz, draw_sz))
+					canvas.draw_texture_rect_region(sheet, dest_rect, f_rect)
+
+				if is_first:
+					var tag_col := Color.YELLOW if is_q_selected else (Color(0.35, 0.85, 1.0) if is_current else Color(0.5, 0.7, 0.9, 0.7))
+					canvas.draw_string(ThemeDB.fallback_font, slot_canvas + Vector2(q_radius + 5.0, 4.0),
+						"Queue %d [Q]" % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, tag_col)
 
 	# Exit paths
-	if current_config.has_exit:
+	if current_config and current_config.has_exit:
 		for ei in range(current_config.exit_configs.size()):
 			var ecfg: ExitConfig = current_config.exit_configs[ei]
 			var ecol := Color(1.0, 0.35, 0.35, 0.9) if ei == current_exit_idx else Color(0.8, 0.5, 0.5, 0.6)
@@ -1105,45 +1339,6 @@ func on_canvas_draw(canvas: Control) -> void:
 				canvas.draw_string(ThemeDB.fallback_font,
 					_world_to_canvas(pts[0], canvas) + Vector2(8, -4),
 					ecfg.label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ecol)
-
-	# Queue visual preview
-	if current_config:
-		var q_count: int = current_config.queue_count
-		var q_indices := current_config.queue_fruit_indices
-		var sheet := _get_sheet()
-
-		# Queue base position relative to route center
-		var q_base_rel: Vector2 = current_config.queue_base_position - current_config.route_position
-		var q_base_canvas: Vector2 = _world_to_canvas(q_base_rel, canvas)
-
-		# Draw queue connector line
-		if q_count > 1:
-			var p0_canvas: Vector2 = q_base_canvas
-			var p_last_canvas: Vector2 = q_base_canvas + current_config.queue_step * canvas_zoom * float(q_count - 1)
-			canvas.draw_line(p0_canvas, p_last_canvas, Color(0.2, 0.7, 1.0, 0.45), 2.0)
-
-		for qi in range(q_count):
-			var slot_canvas: Vector2 = q_base_canvas + current_config.queue_step * canvas_zoom * float(qi)
-
-			var fruit_idx: int = 0
-			if q_indices.size() > 0:
-				fruit_idx = q_indices[qi % q_indices.size()]
-
-			var is_first: bool = (qi == 0)
-			var q_radius: float = clampf(14.0 * canvas_zoom, 7.0, 18.0)
-
-			var bg_col := Color(0.2, 0.8, 1.0, 0.95) if (is_first and selected_is_queue) else (Color(0.2, 0.6, 1.0, 0.8) if is_first else Color(0.15, 0.35, 0.65, 0.6))
-			canvas.draw_circle(slot_canvas, q_radius + 2.0, bg_col)
-
-			if sheet and fruit_idx >= 0 and fruit_idx < _FRUIT_REGIONS.size():
-				var f_rect: Rect2 = _FRUIT_REGIONS[fruit_idx] as Rect2
-				var draw_sz := (q_radius * 2.0)
-				var dest_rect := Rect2(slot_canvas - Vector2(draw_sz * 0.5, draw_sz * 0.5), Vector2(draw_sz, draw_sz))
-				canvas.draw_texture_rect_region(sheet, dest_rect, f_rect)
-
-			if is_first:
-				canvas.draw_string(ThemeDB.fallback_font, slot_canvas + Vector2(q_radius + 5.0, 4.0),
-					"Queue [Q]", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.35, 0.85, 1.0))
 
 	# Coordinate readout at origin
 	var orig := _world_to_canvas(Vector2.ZERO, canvas)
@@ -1244,11 +1439,14 @@ func on_canvas_input(event: InputEvent, canvas: Control) -> void:
 		elif is_dragging:
 			if selected_is_queue and current_config:
 				var world := _canvas_to_world(mm.position, canvas)
-				current_config.queue_base_position = current_config.route_position + world
-				if is_instance_valid(queue_pos_x): queue_pos_x.set_value_no_signal(current_config.queue_base_position.x)
-				if is_instance_valid(queue_pos_y): queue_pos_y.set_value_no_signal(current_config.queue_base_position.y)
-				_mark_dirty()
-				canvas.queue_redraw()
+				if selected_queue_idx >= 0 and selected_queue_idx < current_config.entry_configs.size():
+					current_config.entry_configs[selected_queue_idx].queue_base_position = world
+					if selected_queue_idx == current_entry_idx:
+						if is_instance_valid(queue_pos_x): queue_pos_x.set_value_no_signal(world.x)
+						if is_instance_valid(queue_pos_y): queue_pos_y.set_value_no_signal(world.y)
+					_sync_legacy_queue_fields()
+					_mark_dirty()
+					canvas.queue_redraw()
 			elif selected_idx >= 0:
 				_move_selected_point(_canvas_to_world(mm.position, canvas))
 				canvas.queue_redraw()
@@ -1278,25 +1476,40 @@ func _handle_left_click(mouse: Vector2, canvas: Control) -> void:
 
 		EditMode.ENTRY:
 			if current_config:
-				var q_base_rel: Vector2 = current_config.queue_base_position - current_config.route_position
-				var q0_canvas: Vector2 = _world_to_canvas(q_base_rel, canvas)
-				if q0_canvas.distance_to(mouse) <= 16.0:
+				_ensure_entry_configs()
+				var hit_q := _hit_entry_queue(mouse, canvas)
+				if hit_q >= 0:
+					current_entry_idx = hit_q
+					selected_queue_idx = hit_q
 					selected_is_queue = true
 					is_dragging = true
 					selected_idx = -1
+					_sync_entry_ui_from_current()
 					canvas_ctrl.queue_redraw()
 					return
 
-			var hit := _hit_entry_point(mouse, canvas)
-			if hit >= 0:
-				selected_idx = hit
-				is_dragging  = true
-			else:
-				var arr := PackedVector2Array(current_config.entry_points)
-				arr.append(world)
-				current_config.entry_points = arr
-				selected_idx = arr.size() - 1
-				_mark_dirty()
+				var hit_ep := _hit_entry_point(mouse, canvas)
+				if hit_ep >= 0:
+					current_entry_idx = hit_ep
+					selected_idx = hit_ep
+					is_dragging  = true
+					_sync_entry_ui_from_current()
+				else:
+					var idx := current_config.entry_configs.size()
+					var ec := EntryConfig.new()
+					ec.label = "Entry %d" % (idx + 1)
+					ec.entry_point = world
+					ec.queue_step = Vector2(0.0, 44.0)
+					ec.queue_base_position = world + ec.queue_step
+					ec.queue_count = 6
+					ec.queue_fruit_indices = PackedInt32Array([0, 1, 2, 3])
+					ec.queue_random_fruit = false
+					current_config.entry_configs.append(ec)
+					current_entry_idx = current_config.entry_configs.size() - 1
+					selected_idx = current_entry_idx
+					_sync_legacy_queue_fields()
+					_refresh_entry_select()
+					_mark_dirty()
 
 		EditMode.EXIT:
 			if current_config.exit_configs.is_empty():
@@ -1330,10 +1543,14 @@ func _handle_right_click(mouse: Vector2, canvas: Control) -> void:
 		EditMode.ENTRY:
 			var hit := _hit_entry_point(mouse, canvas)
 			if hit >= 0:
-				var arr := PackedVector2Array(current_config.entry_points)
-				arr.remove_at(hit)
-				current_config.entry_points = arr
+				if current_config.entry_configs.size() <= 1:
+					push_warning("Level Builder: Cannot delete the only entry point.")
+					return
+				current_config.entry_configs.remove_at(hit)
+				current_entry_idx = clampi(current_entry_idx - 1, 0, current_config.entry_configs.size() - 1)
 				selected_idx = -1
+				_sync_legacy_queue_fields()
+				_refresh_entry_select()
 				_mark_dirty()
 
 		EditMode.EXIT:
@@ -1367,10 +1584,9 @@ func _move_selected_point(world: Vector2) -> void:
 				_mark_dirty()
 
 		EditMode.ENTRY:
-			if selected_idx >= 0 and selected_idx < current_config.entry_points.size():
-				var arr := PackedVector2Array(current_config.entry_points)
-				arr[selected_idx] = world
-				current_config.entry_points = arr
+			if selected_idx >= 0 and selected_idx < current_config.entry_configs.size():
+				current_config.entry_configs[selected_idx].entry_point = world
+				_sync_legacy_queue_fields()
 				_mark_dirty()
 
 		EditMode.EXIT:
@@ -1389,9 +1605,25 @@ func _hit_loop_point(mouse: Vector2, canvas: Control) -> int:
 			return i
 	return -1
 
+
 func _hit_entry_point(mouse: Vector2, canvas: Control) -> int:
-	for i in range(current_config.entry_points.size()):
-		if _world_to_canvas(current_config.entry_points[i], canvas).distance_to(mouse) <= 9.0:
+	if not current_config:
+		return -1
+	_ensure_entry_configs()
+	for i in range(current_config.entry_configs.size()):
+		var ep: Vector2 = current_config.entry_configs[i].entry_point
+		if _world_to_canvas(ep, canvas).distance_to(mouse) <= 9.0:
+			return i
+	return -1
+
+
+func _hit_entry_queue(mouse: Vector2, canvas: Control) -> int:
+	if not current_config:
+		return -1
+	_ensure_entry_configs()
+	for i in range(current_config.entry_configs.size()):
+		var q_pos: Vector2 = current_config.entry_configs[i].queue_base_position
+		if _world_to_canvas(q_pos, canvas).distance_to(mouse) <= 16.0:
 			return i
 	return -1
 
