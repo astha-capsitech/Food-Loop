@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dmahiwhvw8t5g" path="res://ExitConfig.gd" id="1_jj6u0"]
 [ext_resource type="Script" uid="uid://cfjkkrdpu30da" path="res://LevelConfig.gd" id="2_cxk4q"]
-[ext_resource type="Texture2D" uid="uid://bq46ek6us3v4k" path="res://Assets/Sprites/cube.png" id="3_jj6u0"]
+[ext_resource type="Texture2D" uid="uid://bq46ek6us3v4k" path="res://Assets/Sprites/cube.png" id="3_sqejx"]
 
 [sub_resource type="Resource" id="Resource_oq5t2"]
 script = ExtResource("1_jj6u0")
@@ -12,7 +12,7 @@ exit_points = PackedVector2Array(-2.3993485, -155.15787, -2.3993485, -203.14484,
 script = ExtResource("2_cxk4q")
 level_number = 2
 title = "Level 2"
-track_texture = ExtResource("3_jj6u0")
+track_texture = ExtResource("3_sqejx")
 loop_points = PackedVector2Array(-0.8052985, 146.56433, 118.37888, 148.17493, 165.0862, 124.015976, 174.74979, 62.813286, 173.13919, -86.972244, 153.81203, -124.015976, 108.7153, -138.51135, -111.93649, -144.95374, -158.64381, -124.015976, -181.19217, -77.30866, -179.58157, 80.529854, -157.03322, 124.015976, -103.883514, 143.34314)
 entry_points = PackedVector2Array(0.13751437, 172.88396)
 has_exit = true
