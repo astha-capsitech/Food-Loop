@@ -38,8 +38,9 @@ class_name LevelConfig
 
 # ─── Entry / Exit ─────────────────────────────────────────────────────────────
 @export_group("Entry and Exit")
-## One or more entry positions (sprite-local). Foods enter the loop here.
-## Multiple entries are used in round-robin order.
+## Ordered list of entry configurations. Each holds an entry point, approach path, and queue.
+@export var entry_configs: Array[EntryConfig] = []
+## Legacy entry positions (sprite-local). Maintained for backwards compatibility.
 @export var entry_points: PackedVector2Array = []
 ## Whether this level has at least one exit path.
 @export var has_exit: bool = false
@@ -81,12 +82,45 @@ func get_loop_curve() -> Curve2D:
 	return curve
 
 
-## Returns the baked-length progress offset of entry_points[entry_idx] along
+## Returns all entry configurations.
+## If entry_configs is empty, synthesizes default EntryConfig(s) from legacy fields
+## to guarantee 100% backward compatibility with existing level resources.
+func get_entry_configs() -> Array[EntryConfig]:
+	if not entry_configs.is_empty():
+		return entry_configs
+
+	var synthesized: Array[EntryConfig] = []
+	if not entry_points.is_empty():
+		for i in range(entry_points.size()):
+			var ec := EntryConfig.new()
+			ec.label = "Entry %d" % (i + 1)
+			ec.entry_point = entry_points[i]
+			ec.queue_step = queue_step
+			ec.queue_count = queue_count
+			ec.queue_fruit_indices = queue_fruit_indices
+			ec.queue_random_fruit = queue_random_fruit
+			ec.queue_base_position = queue_base_position - route_position if i == 0 else entry_points[i] + queue_step
+			synthesized.append(ec)
+	else:
+		var ec := EntryConfig.new()
+		ec.label = "Entry 1"
+		ec.entry_point = Vector2.ZERO
+		ec.queue_step = queue_step
+		ec.queue_count = queue_count
+		ec.queue_fruit_indices = queue_fruit_indices
+		ec.queue_random_fruit = queue_random_fruit
+		ec.queue_base_position = queue_base_position - route_position
+		synthesized.append(ec)
+	return synthesized
+
+
+## Returns the baked-length progress offset of entry_configs[entry_idx] along
 ## [param curve]. Falls back to 0.0 when no entry points are defined.
 func get_entry_progress(curve: Curve2D, entry_idx: int = 0) -> float:
-	if entry_points.is_empty():
+	var cfgs := get_entry_configs()
+	if cfgs.is_empty():
 		return 0.0
-	var ep: Vector2 = entry_points[entry_idx % entry_points.size()]
+	var ep: Vector2 = cfgs[entry_idx % cfgs.size()].entry_point
 	return curve.get_closest_offset(ep)
 
 
