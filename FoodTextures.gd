@@ -41,3 +41,19 @@ static func get_random_texture() -> AtlasTexture:
 
 static func get_total_fruit_types() -> int:
 	return FRUIT_REGIONS.size()
+
+const DEFAULT_FRUIT_SIZES: Array[float] = [
+	44.0, # 0: Apple
+	42.0, # 1: Orange
+	34.0, # 2: Plum / Blueberry
+	40.0, # 3: Peach
+	48.0, # 4: Pineapple
+	42.0, # 5: Pear
+	44.0, # 6: Banana
+	36.0, # 7: Grape
+	34.0, # 8: Lemon
+	50.0  # 9: Watermelon
+]
+
+static func get_default_fruit_size(index: int) -> float:
+	return DEFAULT_FRUIT_SIZES[index % DEFAULT_FRUIT_SIZES.size()]

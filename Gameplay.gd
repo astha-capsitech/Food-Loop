@@ -481,7 +481,8 @@ func spawn_initial_circulating() -> void:
 		var f: Food = food_scene.instantiate() as Food
 		loop_path.add_child(f)
 		var tex: AtlasTexture = FoodTextures.get_fruit_texture(indices[i])
-		f.setup_fruit(tex, false, active_config.speed, indices[i])
+		var f_sz: float = active_config.get_fruit_size(indices[i])
+		f.setup_fruit(tex, false, active_config.speed, indices[i], f_sz)
 		f.start_circulating(i * gap)
 		circulating.append(f)
 
@@ -512,7 +513,8 @@ func spawn_queue() -> void:
 			else:
 				f_idx = 0
 				tex = FoodTextures.get_fruit_texture(0)
-			f.setup_fruit(tex, true, active_config.speed, f_idx)
+			var f_sz: float = active_config.get_fruit_size(f_idx)
+			f.setup_fruit(tex, true, active_config.speed, f_idx, f_sz)
 			f.position = ec.queue_step * float(slot)
 			q_list.append(f)
 		queues.append(q_list)
@@ -644,15 +646,31 @@ func enter_next_food() -> void:
 func get_colliding_food_at_entry(entry_idx: int = 0) -> Food:
 	var curve_len: float  = loop_path.curve.get_baked_length()
 	var entry_prog: float = entry_progs[entry_idx] if entry_idx < entry_progs.size() else active_config.get_entry_progress(loop_path.curve, entry_idx)
+
+	# Determine the entering fruit's target size
+	var entering_size: float = 42.0
+	if entry_idx < queues.size() and not queues[entry_idx].is_empty():
+		var first_in_q: Food = queues[entry_idx][0]
+		if is_instance_valid(first_in_q):
+			entering_size = first_in_q.target_size
+
 	for f: Food in circulating:
 		if not is_instance_valid(f) or f.state != Food.State.CIRCULATING:
 			continue
+
+		var circ_size: float = f.target_size
+		# Dynamic touch distance = (entering_size + circ_size) / 2
+		var touch_dist: float = (entering_size + circ_size) * 0.5
+		# Respect any custom min_gap scaling (default min_gap = 44.0 means ~1:1 with touch_dist)
+		var gap_ratio: float = active_config.min_gap / 44.0 if active_config.min_gap > 0.0 else 1.0
+		var required_gap: float = maxf(touch_dist, touch_dist * gap_ratio)
+
 		# Protect newly entered queue fruits while they are still in the entry area
-		if f.is_player and f.total_travel < active_config.min_gap:
+		if f.is_player and f.total_travel < required_gap:
 			continue
 		var diff: float = absf(fposmod(f.progress - entry_prog, curve_len))
 		diff = minf(diff, curve_len - diff)
-		if diff < active_config.min_gap:
+		if diff < required_gap:
 			return f
 	return null
 

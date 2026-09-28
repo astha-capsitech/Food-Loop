@@ -25,12 +25,14 @@ func _ready() -> void:
 	loop = true
 	set_process(false)
 
-func setup_fruit(tex: AtlasTexture, p_is_player: bool = false, p_speed: float = 60.0, p_fruit_index: int = 0) -> void:
-	if not is_node_ready():
-		await ready
+func setup_fruit(tex: AtlasTexture, p_is_player: bool = false, p_speed: float = 60.0, p_fruit_index: int = 0, p_size: float = 42.0) -> void:
 	is_player = p_is_player
 	speed = p_speed
 	fruit_index = p_fruit_index
+	target_size = p_size
+
+	if not is_node_ready():
+		await ready
 	
 	if sprite:
 		sprite.texture = tex

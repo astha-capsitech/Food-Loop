@@ -68,6 +68,25 @@ class_name LevelConfig
 ## The number of obstacles equals this array's size.
 @export var initial_fruit_indices: PackedInt32Array = []
 
+# ─── Fruit Sizes ─────────────────────────────────────────────────────────────
+@export_group("Fruit Sizes")
+## Target display sizes (in pixels) for each of the 10 fruit types.
+## If empty or not set, DEFAULT_FRUIT_SIZES are used automatically.
+@export var fruit_sizes: PackedFloat32Array = []
+
+const DEFAULT_FRUIT_SIZES: PackedFloat32Array = [
+	44.0, # 0: Apple
+	42.0, # 1: Orange
+	34.0, # 2: Plum / Blueberry
+	40.0, # 3: Peach
+	48.0, # 4: Pineapple
+	42.0, # 5: Pear
+	44.0, # 6: Banana
+	36.0, # 7: Grape
+	34.0, # 8: Lemon
+	50.0  # 9: Watermelon
+]
+
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -136,3 +155,13 @@ func get_exit_progress(curve: Curve2D, exit_idx: int = 0) -> float:
 	if cfg.exit_points.is_empty():
 		return -1.0
 	return curve.get_closest_offset(cfg.exit_points[0])
+
+
+## Returns the target display size (in pixels) for the given fruit type index.
+## Falls back safely to DEFAULT_FRUIT_SIZES for legacy levels where fruit_sizes is empty.
+func get_fruit_size(index: int) -> float:
+	if fruit_sizes.size() > index and fruit_sizes[index] > 0.0:
+		return fruit_sizes[index]
+	if index >= 0 and index < DEFAULT_FRUIT_SIZES.size():
+		return DEFAULT_FRUIT_SIZES[index]
+	return 42.0
