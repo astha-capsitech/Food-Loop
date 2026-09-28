@@ -6,7 +6,7 @@
 
 [sub_resource type="Resource" id="Resource_nthkp"]
 script = ExtResource("1_nthkp")
-exit_points = PackedVector2Array(0, -171.38625, -1.7224748, -250.62007)
+exit_points = PackedVector2Array()
 
 [resource]
 script = ExtResource("2_xmklp")
@@ -14,9 +14,8 @@ level_number = 8
 title = "Level 8"
 track_texture = ExtResource("3_nthkp")
 loop_points = PackedVector2Array(-2.583712, 138.65923, -67.17651, 136.93674, -116.267044, 139.52046, -157.60645, 120.573235, -173.96996, 74.92765, -178.27614, 18.947222, -175.69243, -29.28207, -173.10872, -80.09508, -149.8553, -124.01818, -116.267044, -135.21426, -74.92765, -138.65923, -25.837122, -138.65923, 8.612374, -136.0755, 55.98043, -136.0755, 111.96086, -136.0755, 144.68788, -129.18561, 166.21881, -107.65467, 177.4149, -66.31528, 173.10872, -30.143309, 173.96996, -6.8898993, 175.69243, 31.865784, 173.96996, 68.03775, 167.94128, 106.793434, 152.43901, 124.01818, 134.35303, 134.35303, 105.07096, 136.0755, 75.78889, 138.65923)
-speed = 210.0
+speed = 150.0
 entry_points = PackedVector2Array(-94.736115, 170.95563)
-has_exit = true
 exit_configs = Array[ExtResource("1_nthkp")]([SubResource("Resource_nthkp")])
 queue_fruit_indices = PackedInt32Array(2, 1, 7)
 initial_fruit_indices = PackedInt32Array(7, 2, 8, 8, 7, 7, 3, 3, 1)

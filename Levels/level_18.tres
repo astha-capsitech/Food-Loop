@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://cutvt0vlrkgkl"]
+
+[ext_resource type="Script" uid="uid://dmahiwhvw8t5g" path="res://ExitConfig.gd" id="1_jcacv"]
+[ext_resource type="Script" uid="uid://cfjkkrdpu30da" path="res://LevelConfig.gd" id="2_8ig1n"]
+[ext_resource type="Texture2D" uid="uid://cbgnu1bn117gd" path="res://Assets/Sprites/circle.png" id="3_bc7od"]
+
+[resource]
+script = ExtResource("2_8ig1n")
+level_number = 18
+title = "Level 18"
+track_texture = ExtResource("3_bc7od")
+loop_points = PackedVector2Array(-4.4885836, 173.37155, -62.84017, 162.15009, -105.48172, 143.07361, -152.61185, 93.69918, -173.93262, 47.6912, -182.90979, -3.9275107, -173.93262, -52.179787, -145.87897, -112.775665, -102.11528, -147.5622, -65.084465, -172.2494, 13.465751, -181.22656, 61.718025, -170.00511, 112.21459, -145.3179, 145.87897, -101.55421, 176.17691, -52.179787, 177.29906, 7.2939487, 171.68832, 54.424076, 145.87897, 99.30991, 109.9703, 138.58502, 54.98515, 165.51653)
+speed = 250.0
+entry_points = PackedVector2Array(6.316799, 210.55997)
+queue_fruit_indices = PackedInt32Array(2, 2, 2, 2, 2, 2, 2, 2, 2)
+queue_base_position = Vector2(357.8944, 892.45435)
+initial_fruit_indices = PackedInt32Array(6, 6, 6, 6, 6, 6)
