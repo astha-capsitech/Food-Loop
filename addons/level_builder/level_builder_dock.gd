@@ -83,6 +83,7 @@ var entry_label_edit: LineEdit
 var exit_select: OptionButton
 var exit_label_edit: LineEdit
 var rule_select: OptionButton
+var exit_fruit_select: OptionButton
 var route_pos_x: SpinBox
 var route_pos_y: SpinBox
 var route_scale_x: SpinBox
@@ -96,6 +97,9 @@ var queue_pos_x: SpinBox
 var queue_pos_y: SpinBox
 var queue_step_x: SpinBox
 var queue_step_y: SpinBox
+var fruit_size_spins: Array[SpinBox] = []
+var fruit_sizes_box: VBoxContainer
+var fruit_sizes_toggle_btn: Button
 var selected_is_queue: bool = false
 var selected_queue_idx: int = -1
 var file_dialog: EditorFileDialog
@@ -482,6 +486,25 @@ func _build_exit_settings(parent: Control) -> void:
 		_get_current_exit_cfg_safe(func(c): c.assign_rule = rule_select.get_item_text(idx); _mark_dirty()))
 	row2.add_child(rule_select)
 
+	var row3 := HBoxContainer.new()
+	row3.add_theme_constant_override("separation", 6)
+	exit_settings_box.add_child(row3)
+	row3.add_child(_make_label("Target Fruit:"))
+	exit_fruit_select = OptionButton.new()
+	exit_fruit_select.custom_minimum_size = Vector2(140, 0)
+	exit_fruit_select.add_item("Any Fruit (-1)")
+	for i in range(_FRUIT_NAMES.size()):
+		exit_fruit_select.add_item("%d - %s" % [i, _FRUIT_NAMES[i]])
+	exit_fruit_select.item_selected.connect(func(idx: int):
+		var fruit_val: int = idx - 1
+		_get_current_exit_cfg_safe(func(c: ExitConfig):
+			c.target_fruit_type = fruit_val
+			_mark_dirty()
+			_update_canvas()
+		)
+	)
+	row3.add_child(exit_fruit_select)
+
 	var hint := Label.new()
 	hint.text = "Exit mode: click canvas to add exit path points.  Right-click to delete."
 	hint.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
@@ -491,7 +514,7 @@ func _build_exit_settings(parent: Control) -> void:
 
 func _build_right_panel(parent: Control) -> void:
 	var vb := VBoxContainer.new()
-	vb.custom_minimum_size = Vector2(185, 0)
+	vb.custom_minimum_size = Vector2(200, 0)
 	vb.add_theme_constant_override("separation", 6)
 	parent.add_child(vb)
 
@@ -571,6 +594,108 @@ func _build_right_panel(parent: Control) -> void:
 	initial_flow = HFlowContainer.new()
 	initial_flow.set_h_size_flags(SIZE_EXPAND_FILL)
 	i_scroll.add_child(initial_flow)
+
+	vb.add_child(HSeparator.new())
+
+	# ── Fruit Sizes ───────────────────────────────────────────────────────────
+	_build_fruit_sizes_section(vb)
+
+
+func _build_fruit_sizes_section(parent: Control) -> void:
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 4)
+	parent.add_child(header)
+
+	fruit_sizes_toggle_btn = Button.new()
+	fruit_sizes_toggle_btn.text = "▼ Fruit Sizes (px)"
+	fruit_sizes_toggle_btn.flat = true
+	fruit_sizes_toggle_btn.set_h_size_flags(SIZE_EXPAND_FILL)
+	fruit_sizes_toggle_btn.pressed.connect(func():
+		if is_instance_valid(fruit_sizes_box):
+			fruit_sizes_box.visible = not fruit_sizes_box.visible
+			fruit_sizes_toggle_btn.text = ("▼ Fruit Sizes (px)" if fruit_sizes_box.visible else "▶ Fruit Sizes (px)")
+	)
+	header.add_child(fruit_sizes_toggle_btn)
+
+	var reset_btn := Button.new()
+	reset_btn.text = "↺"
+	reset_btn.tooltip_text = "Reset all fruit sizes to defaults"
+	reset_btn.custom_minimum_size = Vector2(24, 0)
+	reset_btn.pressed.connect(_reset_fruit_sizes_to_default)
+	header.add_child(reset_btn)
+
+	fruit_sizes_box = VBoxContainer.new()
+	fruit_sizes_box.add_theme_constant_override("separation", 2)
+	parent.add_child(fruit_sizes_box)
+
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 3)
+	fruit_sizes_box.add_child(grid)
+
+	fruit_size_spins.clear()
+	for i in range(_FRUIT_REGIONS.size()):
+		var cell := HBoxContainer.new()
+		cell.add_theme_constant_override("separation", 2)
+		grid.add_child(cell)
+
+		var icon := TextureRect.new()
+		icon.texture = _make_fruit_atlas(i)
+		icon.custom_minimum_size = Vector2(20, 20)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.tooltip_text = _FRUIT_NAMES[i]
+		cell.add_child(icon)
+
+		var default_sz: float = LevelConfig.DEFAULT_FRUIT_SIZES[i] if i < LevelConfig.DEFAULT_FRUIT_SIZES.size() else 42.0
+		var spin := _make_spinbox(20.0, 90.0, 1.0, default_sz, 48.0)
+		spin.tooltip_text = "%s size (pixels)" % _FRUIT_NAMES[i]
+		spin.value_changed.connect(_on_fruit_size_spin_changed.bind(i))
+		cell.add_child(spin)
+		fruit_size_spins.append(spin)
+
+
+func _on_fruit_size_spin_changed(val: float, idx: int) -> void:
+	if not current_config:
+		return
+	_ensure_fruit_sizes()
+	if idx < current_config.fruit_sizes.size():
+		current_config.fruit_sizes[idx] = val
+		_mark_dirty()
+		_update_canvas()
+
+
+func _ensure_fruit_sizes() -> void:
+	if not current_config:
+		return
+	if current_config.fruit_sizes.size() < _FRUIT_REGIONS.size():
+		var arr := PackedFloat32Array()
+		for i in range(_FRUIT_REGIONS.size()):
+			if i < current_config.fruit_sizes.size() and current_config.fruit_sizes[i] > 0.0:
+				arr.append(current_config.fruit_sizes[i])
+			elif i < LevelConfig.DEFAULT_FRUIT_SIZES.size():
+				arr.append(LevelConfig.DEFAULT_FRUIT_SIZES[i])
+			else:
+				arr.append(42.0)
+		current_config.fruit_sizes = arr
+
+
+func _reset_fruit_sizes_to_default() -> void:
+	if not current_config:
+		return
+	current_config.fruit_sizes = LevelConfig.DEFAULT_FRUIT_SIZES.duplicate()
+	_sync_fruit_sizes_ui()
+	_mark_dirty()
+	_update_canvas()
+
+
+func _sync_fruit_sizes_ui() -> void:
+	if not current_config:
+		return
+	for i in range(mini(fruit_size_spins.size(), _FRUIT_REGIONS.size())):
+		var sz: float = current_config.get_fruit_size(i)
+		fruit_size_spins[i].set_value_no_signal(sz)
 
 
 func _build_dialogs() -> void:
@@ -735,6 +860,7 @@ func _sync_ui_from_config() -> void:
 	_refresh_entry_select()
 	_refresh_exit_select()
 	_refresh_initial_display()
+	_sync_fruit_sizes_ui()
 	_update_mode_settings_visibility()
 
 
@@ -746,6 +872,9 @@ func _block_signals(blocked: bool) -> void:
 	             queue_pos_x, queue_pos_y, queue_step_x, queue_step_y]:
 		if is_instance_valid(node):
 			node.set_block_signals(blocked)
+	for spin in fruit_size_spins:
+		if is_instance_valid(spin):
+			spin.set_block_signals(blocked)
 
 
 func _ensure_entry_configs() -> void:
@@ -937,6 +1066,8 @@ func _refresh_exit_select() -> void:
 		exit_select.add_item(current_config.exit_configs[i].label, i)
 	if current_config.exit_configs.is_empty():
 		exit_label_edit.text = ""
+		if is_instance_valid(exit_fruit_select):
+			exit_fruit_select.select(0)
 	else:
 		current_exit_idx = clampi(current_exit_idx, 0, current_config.exit_configs.size() - 1)
 		exit_select.select(current_exit_idx)
@@ -946,6 +1077,9 @@ func _refresh_exit_select() -> void:
 			if rule_select.get_item_text(i) == rule:
 				rule_select.select(i)
 				break
+		if is_instance_valid(exit_fruit_select):
+			var target_f: int = current_config.exit_configs[current_exit_idx].target_fruit_type
+			exit_fruit_select.select(clampi(target_f + 1, 0, exit_fruit_select.item_count - 1))
 
 
 func _add_exit_config() -> void:
@@ -956,6 +1090,7 @@ func _add_exit_config() -> void:
 	var ecfg := ExitConfig.new()
 	ecfg.label = "Exit %s" % letters[idx % letters.length()]
 	ecfg.assign_rule = "any"
+	ecfg.target_fruit_type = -1
 	current_config.exit_configs.append(ecfg)
 	current_config.has_exit = true
 	has_exit_check.set_pressed_no_signal(true)
@@ -1306,7 +1441,10 @@ func on_canvas_draw(canvas: Control) -> void:
 					fruit_idx = q_indices[qi % q_indices.size()]
 
 				var is_first: bool = (qi == 0)
-				var q_radius: float = clampf(14.0 * canvas_zoom, 7.0, 18.0)
+				var f_size: float = current_config.get_fruit_size(fruit_idx) if current_config else 42.0
+				var size_ratio: float = f_size / 42.0
+				var base_radius: float = clampf(14.0 * canvas_zoom, 7.0, 18.0)
+				var q_radius: float = base_radius * size_ratio
 				var is_q_selected: bool = (selected_is_queue and selected_queue_idx == i and is_first)
 
 				var bg_col := Color.YELLOW if is_q_selected else (Color(0.2, 0.8, 1.0, 0.95) if (is_first and is_current) else (Color(0.2, 0.6, 1.0, 0.7) if is_first else Color(0.15, 0.35, 0.65, 0.5)))
@@ -1336,9 +1474,12 @@ func on_canvas_draw(canvas: Control) -> void:
 				if j < pts.size() - 1:
 					_draw_dashed(canvas, cp, _world_to_canvas(pts[j + 1], canvas), ecol)
 			if pts.size() >= 1:
+				var exit_txt := ecfg.label
+				if ecfg.target_fruit_type >= 0 and ecfg.target_fruit_type < _FRUIT_NAMES.size():
+					exit_txt += " (%s)" % _FRUIT_NAMES[ecfg.target_fruit_type]
 				canvas.draw_string(ThemeDB.fallback_font,
 					_world_to_canvas(pts[0], canvas) + Vector2(8, -4),
-					ecfg.label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ecol)
+					exit_txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ecol)
 
 	# Coordinate readout at origin
 	var orig := _world_to_canvas(Vector2.ZERO, canvas)

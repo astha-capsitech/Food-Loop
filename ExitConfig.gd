@@ -19,3 +19,8 @@ class_name ExitConfig
 ## "random"      — future: fruits are randomly assigned to exits.
 @export_enum("any", "fruit_type", "entry_match", "random")
 var assign_rule: String = "any"
+
+## Target fruit type index for this exit (-1 = Any Fruit).
+## 0: Apple, 1: Orange, 2: Plum, 3: Peach, 4: Pineapple,
+## 5: Pear, 6: Banana, 7: Grape, 8: Lemon, 9: Watermelon.
+@export var target_fruit_type: int = -1
