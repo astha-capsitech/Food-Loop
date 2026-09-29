@@ -34,6 +34,8 @@ var entry_round_robin: int = 0
 const TAP_COOLDOWN: float = 0.15
 var last_tap_time: float = -999.0
 
+const PATH_TEXTURE: Texture2D = preload("res://Assets/Sprites/pathtextureflat.png")
+
 ## Dynamically created Line2D nodes for each EntryConfig (parallel arrays).
 var entry_road_nodes: Array[Line2D] = []
 var entry_dash_nodes: Array[Line2D] = []
@@ -80,6 +82,8 @@ var vp_scale_y: float = 1.0
 
 func _ready() -> void:
 	canvas_layer.show()
+	_setup_road_line(entry_road)
+	_setup_road_line(exit_road)
 
 	# ── Editor preview mode ──────────────────────────────────────────────────
 	if FileAccess.file_exists(_PREVIEW_FLAG):
@@ -254,11 +258,11 @@ func _apply_config() -> void:
 				road_node = exit_road
 				dash_node = exit_dashes
 				ind_node = exit_indicator
+				_setup_road_line(road_node)
 			else:
 				# 1. Road Line2D added first (rendered at base)
 				road_node = Line2D.new()
-				road_node.width = exit_road.width
-				road_node.default_color = exit_road.default_color
+				_setup_road_line(road_node)
 				road_node.joint_mode = exit_road.joint_mode
 				route.add_child(road_node)
 
@@ -410,10 +414,10 @@ func _setup_entries_and_queues() -> void:
 		if i == 0:
 			road_node = entry_road
 			dash_node = entry_dashes
+			_setup_road_line(road_node)
 		else:
 			road_node = Line2D.new()
-			road_node.width = entry_road.width
-			road_node.default_color = entry_road.default_color
+			_setup_road_line(road_node)
 			road_node.joint_mode = entry_road.joint_mode
 			route.add_child(road_node)
 
@@ -432,6 +436,14 @@ func _setup_entries_and_queues() -> void:
 		_build_single_entry_road(road_node, dash_node, ec)
 
 
+func _setup_road_line(line: Line2D) -> void:
+	line.texture = PATH_TEXTURE
+	line.texture_mode = Line2D.LINE_TEXTURE_TILE
+	line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	line.default_color = Color.WHITE
+	line.width = 54.0
+
+
 func _build_single_entry_road(road: Line2D, dashes: Line2D, ec: EntryConfig) -> void:
 	road.clear_points()
 	dashes.clear_points()
@@ -443,7 +455,8 @@ func _build_single_entry_road(road: Line2D, dashes: Line2D, ec: EntryConfig) -> 
 
 	road.add_point(entry_local)
 	road.add_point(far_local)
-	_add_dashes(dashes, entry_local, far_local)
+	# pathtextureflat.png already has center dashes, so manual dashes are disabled
+	# _add_dashes(dashes, entry_local, far_local)
 
 
 ## Rebuilds all entry roads according to current active_config entry configs.
@@ -484,7 +497,8 @@ func _rebuild_exit_road() -> void:
 
 		road_node.add_point(exit_local)
 		road_node.add_point(far_local)
-		_add_dashes(dash_node, exit_local, far_local)
+		# pathtextureflat.png already has center dashes, so manual dashes are disabled
+		# _add_dashes(dash_node, exit_local, far_local)
 		if i < exit_indicator_nodes.size() and is_instance_valid(exit_indicator_nodes[i]):
 			exit_indicator_nodes[i].show()
 
