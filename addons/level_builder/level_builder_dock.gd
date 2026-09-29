@@ -83,6 +83,7 @@ var entry_label_edit: LineEdit
 var exit_select: OptionButton
 var exit_label_edit: LineEdit
 var rule_select: OptionButton
+var exit_fruit_select: OptionButton
 var route_pos_x: SpinBox
 var route_pos_y: SpinBox
 var route_scale_x: SpinBox
@@ -484,6 +485,25 @@ func _build_exit_settings(parent: Control) -> void:
 	rule_select.item_selected.connect(func(idx):
 		_get_current_exit_cfg_safe(func(c): c.assign_rule = rule_select.get_item_text(idx); _mark_dirty()))
 	row2.add_child(rule_select)
+
+	var row3 := HBoxContainer.new()
+	row3.add_theme_constant_override("separation", 6)
+	exit_settings_box.add_child(row3)
+	row3.add_child(_make_label("Target Fruit:"))
+	exit_fruit_select = OptionButton.new()
+	exit_fruit_select.custom_minimum_size = Vector2(140, 0)
+	exit_fruit_select.add_item("Any Fruit (-1)")
+	for i in range(_FRUIT_NAMES.size()):
+		exit_fruit_select.add_item("%d - %s" % [i, _FRUIT_NAMES[i]])
+	exit_fruit_select.item_selected.connect(func(idx: int):
+		var fruit_val: int = idx - 1
+		_get_current_exit_cfg_safe(func(c: ExitConfig):
+			c.target_fruit_type = fruit_val
+			_mark_dirty()
+			_update_canvas()
+		)
+	)
+	row3.add_child(exit_fruit_select)
 
 	var hint := Label.new()
 	hint.text = "Exit mode: click canvas to add exit path points.  Right-click to delete."
@@ -1046,6 +1066,8 @@ func _refresh_exit_select() -> void:
 		exit_select.add_item(current_config.exit_configs[i].label, i)
 	if current_config.exit_configs.is_empty():
 		exit_label_edit.text = ""
+		if is_instance_valid(exit_fruit_select):
+			exit_fruit_select.select(0)
 	else:
 		current_exit_idx = clampi(current_exit_idx, 0, current_config.exit_configs.size() - 1)
 		exit_select.select(current_exit_idx)
@@ -1055,6 +1077,9 @@ func _refresh_exit_select() -> void:
 			if rule_select.get_item_text(i) == rule:
 				rule_select.select(i)
 				break
+		if is_instance_valid(exit_fruit_select):
+			var target_f: int = current_config.exit_configs[current_exit_idx].target_fruit_type
+			exit_fruit_select.select(clampi(target_f + 1, 0, exit_fruit_select.item_count - 1))
 
 
 func _add_exit_config() -> void:
@@ -1065,6 +1090,7 @@ func _add_exit_config() -> void:
 	var ecfg := ExitConfig.new()
 	ecfg.label = "Exit %s" % letters[idx % letters.length()]
 	ecfg.assign_rule = "any"
+	ecfg.target_fruit_type = -1
 	current_config.exit_configs.append(ecfg)
 	current_config.has_exit = true
 	has_exit_check.set_pressed_no_signal(true)
@@ -1448,9 +1474,12 @@ func on_canvas_draw(canvas: Control) -> void:
 				if j < pts.size() - 1:
 					_draw_dashed(canvas, cp, _world_to_canvas(pts[j + 1], canvas), ecol)
 			if pts.size() >= 1:
+				var exit_txt := ecfg.label
+				if ecfg.target_fruit_type >= 0 and ecfg.target_fruit_type < _FRUIT_NAMES.size():
+					exit_txt += " (%s)" % _FRUIT_NAMES[ecfg.target_fruit_type]
 				canvas.draw_string(ThemeDB.fallback_font,
 					_world_to_canvas(pts[0], canvas) + Vector2(8, -4),
-					ecfg.label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ecol)
+					exit_txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ecol)
 
 	# Coordinate readout at origin
 	var orig := _world_to_canvas(Vector2.ZERO, canvas)

@@ -40,9 +40,13 @@ var entry_dash_nodes: Array[Line2D] = []
 var entry_progs:      Array[float]  = []
 
 ## Dynamically created Path2D nodes for each ExitConfig (parallel arrays).
-var exit_path_nodes: Array[Path2D] = []
+var exit_path_nodes:      Array[Path2D]     = []
 ## Pre-computed progress offsets along loop_path for each exit trigger point.
-var exit_progs: Array[float] = []
+var exit_progs:           Array[float]      = []
+## Dynamically created Line2D and Polygon2D nodes for each ExitConfig (parallel arrays).
+var exit_road_nodes:      Array[Line2D]     = []
+var exit_dash_nodes:      Array[Line2D]     = []
+var exit_indicator_nodes: Array[Polygon2D]  = []
 
 # ─── Scene nodes ─────────────────────────────────────────────────────────────
 @onready var level_root:      Node2D    = $LevelRoot
@@ -188,6 +192,21 @@ func _clear_level_state() -> void:
 	exit_path_nodes.clear()
 	exit_progs.clear()
 
+	for i: int in range(1, exit_road_nodes.size()):
+		var er: Line2D = exit_road_nodes[i]
+		if is_instance_valid(er): er.queue_free()
+	exit_road_nodes.clear()
+
+	for i: int in range(1, exit_dash_nodes.size()):
+		var ed: Line2D = exit_dash_nodes[i]
+		if is_instance_valid(ed): ed.queue_free()
+	exit_dash_nodes.clear()
+
+	for i: int in range(1, exit_indicator_nodes.size()):
+		var ind: Polygon2D = exit_indicator_nodes[i]
+		if is_instance_valid(ind): ind.queue_free()
+	exit_indicator_nodes.clear()
+
 	player_foods_in_play  = 0
 	game_over             = false
 	level_won             = false
@@ -215,25 +234,54 @@ func _apply_config() -> void:
 
 	# ── 3. Build loop curve ──────────────────────────────────────────────────────
 	loop_path.curve = active_config.get_loop_curve()
+	loop_path.z_index = 5
 
 	# ── 4. Setup entry points, entry roads, and queue containers ──────────────
 	_setup_entries_and_queues()
 
 	# ── 6. Setup exit paths ─────────────────────────────────────────────────────
 	if active_config.has_exit and not active_config.exit_configs.is_empty():
-		exit_indicator.show()
 		for i: int in range(active_config.exit_configs.size()):
 			var ecfg: ExitConfig = active_config.exit_configs[i]
 			var ep_node: Path2D
+			var road_node: Line2D
+			var dash_node: Line2D
+			var ind_node: Polygon2D
 
 			if i == 0:
-				# Reuse the existing ExitPath2D for the first exit
 				ep_node = exit_path
 				ep_node.show()
+				road_node = exit_road
+				dash_node = exit_dashes
+				ind_node = exit_indicator
 			else:
-				# Dynamically add extra exit paths as children of Route
+				# 1. Road Line2D added first (rendered at base)
+				road_node = Line2D.new()
+				road_node.width = exit_road.width
+				road_node.default_color = exit_road.default_color
+				road_node.joint_mode = exit_road.joint_mode
+				route.add_child(road_node)
+
+				# 2. Dashes Line2D added second
+				dash_node = Line2D.new()
+				dash_node.width = exit_dashes.width
+				dash_node.default_color = exit_dashes.default_color
+				dash_node.joint_mode = exit_dashes.joint_mode
+				route.add_child(dash_node)
+
+				# 3. Indicator Polygon2D added third
+				ind_node = Polygon2D.new()
+				ind_node.polygon = exit_indicator.polygon
+				route.add_child(ind_node)
+
+				# 4. Exit Path2D added last (so fruits are rendered above roads)
 				ep_node = Path2D.new()
 				route.add_child(ep_node)
+
+			road_node.z_index = 0
+			dash_node.z_index = 1
+			ind_node.z_index = 2
+			ep_node.z_index = 5
 
 			var exit_curve := Curve2D.new()
 			for p: Vector2 in ecfg.exit_points:
@@ -247,17 +295,21 @@ func _apply_config() -> void:
 			ep_node.curve = exit_curve
 
 			exit_path_nodes.append(ep_node)
+			exit_road_nodes.append(road_node)
+			exit_dash_nodes.append(dash_node)
+			exit_indicator_nodes.append(ind_node)
 			exit_progs.append(active_config.get_exit_progress(loop_path.curve, i))
 
-		# Orient exit indicator toward first exit
-		var first: ExitConfig = active_config.exit_configs[0]
-		if not first.exit_points.is_empty():
-			exit_indicator.position = first.exit_points[0]
-			if first.exit_points.size() > 1:
-				var dir: Vector2 = (first.exit_points[1] - first.exit_points[0]).normalized()
-				exit_indicator.rotation = dir.angle() + PI / 2.0
+			# Position, orient, and color each exit indicator based on target fruit type
+			if not ecfg.exit_points.is_empty():
+				ind_node.position = ecfg.exit_points[0]
+				if ecfg.exit_points.size() > 1:
+					var dir: Vector2 = (ecfg.exit_points[1] - ecfg.exit_points[0]).normalized()
+					ind_node.rotation = dir.angle() + PI / 2.0
+				ind_node.color = FoodTextures.get_fruit_color(ecfg.target_fruit_type)
+				ind_node.show()
 
-		# Auto-generate Exit Road visual
+		# Auto-generate Exit Road visual for all exits
 		_rebuild_exit_road()
 	else:
 		exit_path.hide()
@@ -349,6 +401,7 @@ func _setup_entries_and_queues() -> void:
 
 		qc_node.position = ec.entry_point * active_config.route_scale
 		qc_node.rotation = 0.0
+		qc_node.z_index = 5
 		queue_containers.append(qc_node)
 
 		# Entry Road Visuals (Line2D)
@@ -369,6 +422,9 @@ func _setup_entries_and_queues() -> void:
 			dash_node.default_color = entry_dashes.default_color
 			dash_node.joint_mode = entry_dashes.joint_mode
 			route.add_child(dash_node)
+
+		road_node.z_index = 0
+		dash_node.z_index = 0
 
 		entry_road_nodes.append(road_node)
 		entry_dash_nodes.append(dash_node)
@@ -400,29 +456,37 @@ func _rebuild_entry_road() -> void:
 
 
 func _clear_exit_road() -> void:
+	for r in exit_road_nodes:
+		if is_instance_valid(r): r.clear_points()
+	for d in exit_dash_nodes:
+		if is_instance_valid(d): d.clear_points()
+	for ind in exit_indicator_nodes:
+		if is_instance_valid(ind): ind.hide()
 	exit_road.clear_points()
 	exit_dashes.clear_points()
+	exit_indicator.hide()
 
 
-## Exit road extends from exit_local in the direction of the exit path.
-## Direction = exit_points[0] → exit_points[1] (the path the food takes after exiting).
+## Exit road extends from exit_local in the direction of the exit path for all exits.
 func _rebuild_exit_road() -> void:
-	exit_road.clear_points()
-	exit_dashes.clear_points()
+	_clear_exit_road()
 	if active_config.exit_configs.is_empty():
 		return
-	var first_exit: ExitConfig = active_config.exit_configs[0]
-	if first_exit.exit_points.size() < 2:
-		return
+	for i: int in range(mini(active_config.exit_configs.size(), exit_road_nodes.size())):
+		var ecfg: ExitConfig = active_config.exit_configs[i]
+		if ecfg.exit_points.size() < 2:
+			continue
+		var road_node: Line2D = exit_road_nodes[i]
+		var dash_node: Line2D = exit_dash_nodes[i]
+		var exit_local: Vector2 = ecfg.exit_points[0]
+		var dir: Vector2 = (ecfg.exit_points[1] - exit_local).normalized()
+		var far_local: Vector2 = exit_local + dir * 3000.0
 
-	var exit_local: Vector2 = first_exit.exit_points[0]
-	# Direction from trigger point → next exit waypoint
-	var dir: Vector2 = (first_exit.exit_points[1] - exit_local).normalized()
-	var far_local: Vector2 = exit_local + dir * 3000.0
-
-	exit_road.add_point(exit_local)
-	exit_road.add_point(far_local)
-	_add_dashes(exit_dashes, exit_local, far_local)
+		road_node.add_point(exit_local)
+		road_node.add_point(far_local)
+		_add_dashes(dash_node, exit_local, far_local)
+		if i < exit_indicator_nodes.size() and is_instance_valid(exit_indicator_nodes[i]):
+			exit_indicator_nodes[i].show()
 
 
 ## Shared helper — draws dashed centre-line into [param line] from [param a] to [param b].
@@ -733,7 +797,7 @@ func _process(delta: float) -> void:
 			if not is_instance_valid(f):
 				circulating.remove_at(i)
 				continue
-			if f.is_player and f.state == Food.State.CIRCULATING and f.total_travel >= 12.0:
+			if f.state == Food.State.CIRCULATING and f.total_travel >= 12.0:
 				if _can_food_use_exit(f, ei):
 					var step: float = f.speed * delta
 					var dist_to_ep: float = fposmod(ep - f.progress, curve_len)
@@ -748,6 +812,17 @@ func _can_food_use_exit(f: Food, exit_idx: int) -> bool:
 	if exit_idx >= active_config.exit_configs.size():
 		return false
 	var ecfg: ExitConfig = active_config.exit_configs[exit_idx]
+
+	# 1. Target fruit type matching:
+	if ecfg.target_fruit_type != -1:
+		# Both circulating and player foods matching this fruit type take this exit
+		return f.fruit_index == ecfg.target_fruit_type
+
+	# 2. Legacy / Any Fruit exit (target_fruit_type == -1):
+	# Only player foods use generic exit, preserving balance of existing levels
+	if not f.is_player:
+		return false
+
 	match ecfg.assign_rule:
 		"any":
 			return true
@@ -762,8 +837,9 @@ func _can_food_use_exit(f: Food, exit_idx: int) -> bool:
 	return true
 
 
-func _on_food_exited(_food: Food) -> void:
-	player_foods_in_play = maxi(0, player_foods_in_play - 1)
+func _on_food_exited(food: Food) -> void:
+	if is_instance_valid(food) and food.is_player:
+		player_foods_in_play = maxi(0, player_foods_in_play - 1)
 	update_counter()
 	if active_config.has_exit and are_all_queues_empty() and player_foods_in_play == 0:
 		trigger_win()
