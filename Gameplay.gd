@@ -50,6 +50,47 @@ var exit_road_nodes:      Array[Line2D]     = []
 var exit_dash_nodes:      Array[Line2D]     = []
 var exit_indicator_nodes: Array[Polygon2D]  = []
 
+const TILE_SHEET: Texture2D = preload("res://Assets/Sprites/tilesprite.png")
+const TILE_BASE_SIZE: float = 99.0
+const TILE_RECTS: Array[Rect2] = [
+	Rect2(15,  18,  99, 100), # 0: Cross
+	Rect2(138, 30,  99, 88),  # 1: T-Down
+	Rect2(260, 18,  88, 100), # 2: T-Left
+	Rect2(383, 30,  88, 88),  # 3: Turn BL
+	Rect2(15,  141, 99, 88),  # 4: T-Up
+	Rect2(138, 153, 99, 76),  # 5: Straight H
+	Rect2(260, 141, 87, 88),  # 6: Turn TL
+	Rect2(383, 153, 88, 76),  # 7: Cap Right
+	Rect2(27,  264, 87, 100), # 8: T-Right
+	Rect2(150, 276, 87, 88),  # 9: Turn BR
+	Rect2(273, 264, 74, 99),  # 10: Straight V
+	Rect2(395, 276, 76, 87),  # 11: Cap Top
+	Rect2(26,  386, 88, 89),  # 12: Turn TR
+	Rect2(150, 399, 87, 76),  # 13: Cap Left
+	Rect2(273, 386, 74, 88),  # 14: Cap Bottom
+]
+const TILE_OFFSETS: Array[Vector2] = [
+	Vector2( 0.0,  0.0), # 0: Cross
+	Vector2( 0.0,  5.5), # 1: T-Down
+	Vector2(-5.5,  0.0), # 2: T-Left
+	Vector2(-5.5,  5.5), # 3: Turn BL
+	Vector2( 0.0, -5.5), # 4: T-Up
+	Vector2( 0.0,  0.0), # 5: Straight H
+	Vector2(-6.0, -5.5), # 6: Turn TL
+	Vector2(-5.5,  0.0), # 7: Cap Right
+	Vector2( 6.0,  0.0), # 8: T-Right
+	Vector2( 6.0,  5.5), # 9: Turn BR
+	Vector2( 0.0,  0.0), # 10: Straight V
+	Vector2( 0.0,  6.0), # 11: Cap Top
+	Vector2( 5.5, -5.0), # 12: Turn TR
+	Vector2( 6.0,  0.0), # 13: Cap Left
+	Vector2( 0.0, -5.5), # 14: Cap Bottom
+]
+var tile_road_node: Node2D = null
+var loop_road_border: Line2D = null
+var loop_road_asphalt: Line2D = null
+var loop_road_dashes: Line2D = null
+
 # ─── Scene nodes ─────────────────────────────────────────────────────────────
 @onready var level_root:      Node2D    = $LevelRoot
 @onready var route:           Node2D    = $LevelRoot/Route
@@ -84,6 +125,10 @@ func _ready() -> void:
 	canvas_layer.show()
 	_setup_road_line(entry_road)
 	_setup_road_line(exit_road)
+	entry_road.z_index = -2
+	exit_road.z_index = -2
+	entry_dashes.z_index = -2
+	exit_dashes.z_index = -2
 
 	# ── Editor preview mode ──────────────────────────────────────────────────
 	if FileAccess.file_exists(_PREVIEW_FLAG):
@@ -211,6 +256,16 @@ func _clear_level_state() -> void:
 		if is_instance_valid(ind): ind.queue_free()
 	exit_indicator_nodes.clear()
 
+	if is_instance_valid(loop_road_border):
+		loop_road_border.clear_points()
+		loop_road_border.hide()
+	if is_instance_valid(loop_road_asphalt):
+		loop_road_asphalt.clear_points()
+		loop_road_asphalt.hide()
+	if is_instance_valid(loop_road_dashes):
+		loop_road_dashes.clear_points()
+		loop_road_dashes.hide()
+
 	player_foods_in_play  = 0
 	game_over             = false
 	level_won             = false
@@ -228,13 +283,8 @@ func _apply_config() -> void:
 	route.rotation = 0.0
 	route.scale    = active_config.route_scale
 
-	# ── 2. OvalSprite at origin of Route (same centre as the loop Path2D) ─────────
-	if active_config.track_texture:
-		oval_sprite.texture  = active_config.track_texture
-		oval_sprite.position = Vector2.ZERO   # centred on Route
-		oval_sprite.visible  = true
-	else:
-		oval_sprite.visible = false
+	# ── 2. Track Rendering: Tilemap or OvalSprite ──────────────────────────────
+	_setup_track_visuals()
 
 	# ── 3. Build loop curve ──────────────────────────────────────────────────────
 	loop_path.curve = active_config.get_loop_curve()
@@ -258,18 +308,14 @@ func _apply_config() -> void:
 				road_node = exit_road
 				dash_node = exit_dashes
 				ind_node = exit_indicator
-				_setup_road_line(road_node)
 			else:
 				# 1. Road Line2D added first (rendered at base)
 				road_node = Line2D.new()
-				_setup_road_line(road_node)
 				road_node.joint_mode = exit_road.joint_mode
 				route.add_child(road_node)
 
 				# 2. Dashes Line2D added second
 				dash_node = Line2D.new()
-				dash_node.width = exit_dashes.width
-				dash_node.default_color = exit_dashes.default_color
 				dash_node.joint_mode = exit_dashes.joint_mode
 				route.add_child(dash_node)
 
@@ -282,8 +328,10 @@ func _apply_config() -> void:
 				ep_node = Path2D.new()
 				route.add_child(ep_node)
 
-			road_node.z_index = 0
-			dash_node.z_index = 1
+			_setup_road_line(road_node, dash_node)
+
+			road_node.z_index = -2
+			dash_node.z_index = -2
 			ind_node.z_index = 2
 			ep_node.z_index = 5
 
@@ -329,8 +377,8 @@ func _on_viewport_size_changed() -> void:
 		_apply_responsive_layout()
 
 
-## Responsively scales LevelRoot as a single unit so the loop occupies ~75% of
-## the available viewport width and is centered horizontally.
+## Responsively scales LevelRoot as a single unit so the loop fits comfortably on
+## the screen in both width and height, preventing narrow levels from blowing up.
 func _apply_responsive_layout() -> void:
 	if not active_config or not is_instance_valid(level_root):
 		return
@@ -342,45 +390,171 @@ func _apply_responsive_layout() -> void:
 	vp_scale_x = vp_size.x / DESIGN_W
 	vp_scale_y = vp_size.y / DESIGN_H
 
-	# ── 1. Measure base authored width of the track/loop in design space ────────
-	var base_width: float = 0.0
+	# ── 1. Measure base authored bounds of the track/loop in design space ────────
+	var min_x := INF
+	var max_x := -INF
+	var min_y := INF
+	var max_y := -INF
 
 	var pts: PackedVector2Array = active_config.loop_points
 	if pts.is_empty() and is_instance_valid(loop_path) and loop_path.curve:
 		pts = loop_path.curve.get_baked_points()
 
 	if pts.size() >= 3:
-		var min_x := INF
-		var max_x := -INF
 		for p: Vector2 in pts:
 			min_x = minf(min_x, p.x)
 			max_x = maxf(max_x, p.x)
-		base_width = (max_x - min_x) * absf(active_config.route_scale.x)
+			min_y = minf(min_y, p.y)
+			max_y = maxf(max_y, p.y)
+	elif active_config.use_tilemap and not active_config.placed_tiles.is_empty():
+		var g_size: float = active_config.tile_grid_size if active_config.tile_grid_size > 10.0 else 96.0
+		for cell_key in active_config.placed_tiles:
+			var cx := float(cell_key.x) * g_size
+			var cy := float(cell_key.y) * g_size
+			min_x = minf(min_x, cx - g_size * 0.5)
+			max_x = maxf(max_x, cx + g_size * 0.5)
+			min_y = minf(min_y, cy - g_size * 0.5)
+			max_y = maxf(max_y, cy + g_size * 0.5)
 	elif active_config.track_texture:
 		var tex_sz: Vector2 = active_config.track_texture.get_size()
-		base_width = tex_sz.x * absf(active_config.route_scale.x)
+		min_x = -tex_sz.x * 0.5
+		max_x = tex_sz.x * 0.5
+		min_y = -tex_sz.y * 0.5
+		max_y = tex_sz.y * 0.5
 
-	if base_width <= 10.0:
-		base_width = DESIGN_W * 0.75 # Default fallback: 540.0 px
+	var base_width: float = (max_x - min_x) * absf(active_config.route_scale.x) if (max_x > min_x) else 540.0
+	var base_height: float = (max_y - min_y) * absf(active_config.route_scale.y) if (max_y > min_y) else 540.0
 
-	# ── 2. Target width: exactly 75% of current viewport width ─────────────────
+	# ── 2. Target dimensions ───────────────────────────────────────────────────
 	var target_width: float = vp_size.x * 0.75
+	var target_height: float = vp_size.y * 0.48
 
-	# ── 3. Responsive scale factor ─────────────────────────────────────────────
-	# On higher resolutions (e.g. 1080p, 1440p) scale_factor > 1.0 (scales UP)
-	# On lower resolutions (e.g. 480p) scale_factor < 1.0 (scales DOWN)
-	var scale_factor: float = target_width / base_width
+	# Scale factor fits both width and height, capped so narrow tracks do not over-scale
+	var scale_w := target_width / maxf(base_width, 10.0)
+	var scale_h := target_height / maxf(base_height, 10.0)
+	var scale_factor: float = minf(scale_w, scale_h)
+
+	# Cap maximum scale to design resolution proportion so narrow levels don't blow up
+	var max_scale := (vp_size.x / DESIGN_W) * 1.15
+	scale_factor = minf(scale_factor, max_scale)
 	level_root.scale = Vector2(scale_factor, scale_factor)
 
-	# ── 4. Horizontal centering ────────────────────────────────────────────────
-	# Since route.position is Vector2.ZERO inside LevelRoot, placing LevelRoot at
-	# vp_size.x * 0.5 GUARANTEES route/sprite is dead center on every resolution.
+	# ── 3. Horizontal centering ────────────────────────────────────────────────
 	level_root.position.x = vp_size.x * 0.5
 
-	# ── 5. Vertical positioning ────────────────────────────────────────────────
-	# Preserve the authored vertical proportion (default ~44% from top of screen)
+	# ── 4. Vertical positioning ────────────────────────────────────────────────
 	var authored_y: float = active_config.route_position.y if active_config.route_position.y > 0.0 else 560.0
 	level_root.position.y = vp_size.y * (authored_y / DESIGN_H)
+
+
+# ─── Track Visuals (Tilemap or OvalSprite) ───────────────────────────────────
+
+func _setup_track_visuals() -> void:
+	if active_config.use_tilemap and not active_config.placed_tiles.is_empty():
+		oval_sprite.visible = false
+		if is_instance_valid(loop_road_border): loop_road_border.hide()
+		if is_instance_valid(loop_road_asphalt): loop_road_asphalt.hide()
+		if is_instance_valid(loop_road_dashes): loop_road_dashes.hide()
+		if not is_instance_valid(tile_road_node):
+			tile_road_node = Node2D.new()
+			tile_road_node.name = "TileRoad"
+			tile_road_node.z_index = 0
+			route.add_child(tile_road_node)
+		else:
+			tile_road_node.show()
+			for child in tile_road_node.get_children():
+				child.queue_free()
+
+		var g_size: float = active_config.tile_grid_size if active_config.tile_grid_size > 10.0 else 96.0
+		var scale_ratio: float = (g_size / TILE_BASE_SIZE) * 1.025
+		for cell_key in active_config.placed_tiles:
+			var cell := Vector2i.ZERO
+			if cell_key is Vector2i:
+				cell = cell_key
+			elif cell_key is Vector2:
+				cell = Vector2i(int(cell_key.x), int(cell_key.y))
+			else:
+				continue
+			var tid: int = int(active_config.placed_tiles[cell_key])
+			if tid < 0 or tid >= TILE_RECTS.size():
+				continue
+
+			var spr := Sprite2D.new()
+			spr.texture = TILE_SHEET
+			spr.region_enabled = true
+			spr.region_rect = TILE_RECTS[tid]
+			spr.centered = true
+			spr.offset = TILE_OFFSETS[tid]
+			spr.scale = Vector2(scale_ratio, scale_ratio)
+			spr.position = Vector2(float(cell.x) * g_size, float(cell.y) * g_size)
+			tile_road_node.add_child(spr)
+	elif active_config.track_texture:
+		if is_instance_valid(tile_road_node):
+			tile_road_node.hide()
+		if is_instance_valid(loop_road_border): loop_road_border.hide()
+		if is_instance_valid(loop_road_asphalt): loop_road_asphalt.hide()
+		if is_instance_valid(loop_road_dashes): loop_road_dashes.hide()
+		oval_sprite.texture  = active_config.track_texture
+		oval_sprite.position = Vector2.ZERO
+		oval_sprite.visible  = true
+	else:
+		if is_instance_valid(tile_road_node):
+			tile_road_node.hide()
+		oval_sprite.visible = false
+		_setup_procedural_loop_road()
+
+
+func _setup_procedural_loop_road() -> void:
+	if not is_instance_valid(loop_road_border):
+		loop_road_border = Line2D.new()
+		loop_road_border.name = "LoopRoadBorder"
+		loop_road_border.z_index = -1
+		route.add_child(loop_road_border)
+
+	if not is_instance_valid(loop_road_asphalt):
+		loop_road_asphalt = Line2D.new()
+		loop_road_asphalt.name = "LoopRoadAsphalt"
+		loop_road_asphalt.z_index = -1
+		route.add_child(loop_road_asphalt)
+
+	if is_instance_valid(loop_road_dashes):
+		loop_road_dashes.clear_points()
+		loop_road_dashes.hide()
+
+	loop_road_border.show()
+	loop_road_asphalt.show()
+
+	loop_road_border.clear_points()
+	loop_road_asphalt.clear_points()
+
+	var curve: Curve2D = active_config.get_loop_curve()
+	var baked: PackedVector2Array = curve.get_baked_points()
+	if baked.size() < 3:
+		baked = active_config.loop_points
+	if baked.size() < 3:
+		return
+
+	# Style outer border
+	loop_road_border.texture = null
+	loop_road_border.texture_mode = Line2D.LINE_TEXTURE_NONE
+	loop_road_border.width = 68.0
+	loop_road_border.default_color = Color(0.925, 0.898, 0.824, 1.0)
+	loop_road_border.joint_mode = Line2D.LINE_JOINT_ROUND
+	loop_road_border.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	loop_road_border.end_cap_mode = Line2D.LINE_CAP_ROUND
+
+	# Style inner asphalt
+	loop_road_asphalt.texture = null
+	loop_road_asphalt.texture_mode = Line2D.LINE_TEXTURE_NONE
+	loop_road_asphalt.width = 50.0
+	loop_road_asphalt.default_color = Color(0.424, 0.424, 0.424, 1.0)
+	loop_road_asphalt.joint_mode = Line2D.LINE_JOINT_ROUND
+	loop_road_asphalt.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	loop_road_asphalt.end_cap_mode = Line2D.LINE_CAP_ROUND
+
+	for p in baked:
+		loop_road_border.add_point(p)
+		loop_road_asphalt.add_point(p)
 
 
 # ─── Entry points & Queues setup ─────────────────────────────────────────────
@@ -414,21 +588,19 @@ func _setup_entries_and_queues() -> void:
 		if i == 0:
 			road_node = entry_road
 			dash_node = entry_dashes
-			_setup_road_line(road_node)
 		else:
 			road_node = Line2D.new()
-			_setup_road_line(road_node)
 			road_node.joint_mode = entry_road.joint_mode
 			route.add_child(road_node)
 
 			dash_node = Line2D.new()
-			dash_node.width = entry_dashes.width
-			dash_node.default_color = entry_dashes.default_color
 			dash_node.joint_mode = entry_dashes.joint_mode
 			route.add_child(dash_node)
 
-		road_node.z_index = 0
-		dash_node.z_index = 0
+		_setup_road_line(road_node, dash_node)
+
+		road_node.z_index = -2
+		dash_node.z_index = -2
 
 		entry_road_nodes.append(road_node)
 		entry_dash_nodes.append(dash_node)
@@ -436,12 +608,44 @@ func _setup_entries_and_queues() -> void:
 		_build_single_entry_road(road_node, dash_node, ec)
 
 
-func _setup_road_line(line: Line2D) -> void:
-	line.texture = PATH_TEXTURE
-	line.texture_mode = Line2D.LINE_TEXTURE_TILE
-	line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	line.default_color = Color.WHITE
-	line.width = 54.0
+func _setup_road_line(road_line: Line2D, inner_line: Line2D = null) -> void:
+	if not is_instance_valid(road_line):
+		return
+	if active_config and (active_config.use_tilemap or not active_config.track_texture):
+		var g_size: float = active_config.tile_grid_size if active_config.tile_grid_size > 10.0 else 96.0
+		var scale_ratio: float = (g_size / TILE_BASE_SIZE) * 1.025 if active_config.use_tilemap else 1.0
+		# Outer border (cream)
+		road_line.texture = null
+		road_line.texture_mode = Line2D.LINE_TEXTURE_NONE
+		road_line.default_color = Color(0.925, 0.898, 0.824, 1.0)
+		road_line.width = (74.0 if active_config.use_tilemap else 68.0) * scale_ratio
+		road_line.joint_mode = Line2D.LINE_JOINT_ROUND
+		road_line.begin_cap_mode = Line2D.LINE_CAP_NONE
+		road_line.end_cap_mode = Line2D.LINE_CAP_NONE
+		road_line.z_index = -2
+
+		# Inner asphalt (grey)
+		if is_instance_valid(inner_line):
+			inner_line.texture = null
+			inner_line.texture_mode = Line2D.LINE_TEXTURE_NONE
+			inner_line.default_color = Color(0.424, 0.424, 0.424, 1.0)
+			inner_line.width = 50.0 * scale_ratio
+			inner_line.joint_mode = Line2D.LINE_JOINT_ROUND
+			inner_line.begin_cap_mode = Line2D.LINE_CAP_NONE
+			inner_line.end_cap_mode = Line2D.LINE_CAP_NONE
+			inner_line.z_index = -2
+	else:
+		road_line.texture = PATH_TEXTURE
+		road_line.texture_mode = Line2D.LINE_TEXTURE_TILE
+		road_line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		road_line.default_color = Color.WHITE
+		road_line.width = 54.0
+		road_line.z_index = -2
+		if is_instance_valid(inner_line):
+			inner_line.texture = null
+			inner_line.width = 3.0
+			inner_line.default_color = Color(0.8, 0.8, 0.8, 0.6)
+			inner_line.z_index = -2
 
 
 func _build_single_entry_road(road: Line2D, dashes: Line2D, ec: EntryConfig) -> void:
@@ -455,8 +659,9 @@ func _build_single_entry_road(road: Line2D, dashes: Line2D, ec: EntryConfig) -> 
 
 	road.add_point(entry_local)
 	road.add_point(far_local)
-	# pathtextureflat.png already has center dashes, so manual dashes are disabled
-	# _add_dashes(dashes, entry_local, far_local)
+	if active_config and (active_config.use_tilemap or not active_config.track_texture):
+		dashes.add_point(entry_local)
+		dashes.add_point(far_local)
 
 
 ## Rebuilds all entry roads according to current active_config entry configs.
@@ -480,25 +685,43 @@ func _clear_exit_road() -> void:
 	exit_indicator.hide()
 
 
-## Exit road extends from exit_local in the direction of the exit path for all exits.
+## Exit road extends along all exit_points and then off-screen for all exits.
 func _rebuild_exit_road() -> void:
 	_clear_exit_road()
-	if active_config.exit_configs.is_empty():
+	if not active_config or active_config.exit_configs.is_empty():
 		return
 	for i: int in range(mini(active_config.exit_configs.size(), exit_road_nodes.size())):
 		var ecfg: ExitConfig = active_config.exit_configs[i]
-		if ecfg.exit_points.size() < 2:
+		if ecfg.exit_points.is_empty():
 			continue
 		var road_node: Line2D = exit_road_nodes[i]
 		var dash_node: Line2D = exit_dash_nodes[i]
-		var exit_local: Vector2 = ecfg.exit_points[0]
-		var dir: Vector2 = (ecfg.exit_points[1] - exit_local).normalized()
-		var far_local: Vector2 = exit_local + dir * 3000.0
 
-		road_node.add_point(exit_local)
-		road_node.add_point(far_local)
-		# pathtextureflat.png already has center dashes, so manual dashes are disabled
-		# _add_dashes(dash_node, exit_local, far_local)
+		var full_pts: Array[Vector2] = []
+		for p: Vector2 in ecfg.exit_points:
+			full_pts.append(p)
+
+		# Extend the last segment off-screen so the road reaches past the screen bounds
+		if ecfg.exit_points.size() >= 2:
+			var last_pt: Vector2 = ecfg.exit_points[-1]
+			var prev_pt: Vector2 = ecfg.exit_points[-2]
+			var dir: Vector2 = (last_pt - prev_pt).normalized()
+			if dir.length_squared() > 0.001:
+				full_pts.append(last_pt + dir * 3000.0)
+		elif ecfg.exit_points.size() == 1:
+			full_pts.append(ecfg.exit_points[0] + Vector2.UP * 3000.0)
+
+		for pt: Vector2 in full_pts:
+			road_node.add_point(pt)
+			if active_config.use_tilemap or not active_config.track_texture:
+				dash_node.add_point(pt)
+
+		if not active_config.use_tilemap and ecfg.exit_points.size() >= 2 and active_config.track_texture:
+			var exit_local: Vector2 = ecfg.exit_points[0]
+			var far_local: Vector2 = full_pts[-1]
+			# pathtextureflat.png already has center dashes for legacy levels
+			# _add_dashes(dash_node, exit_local, far_local)
+
 		if i < exit_indicator_nodes.size() and is_instance_valid(exit_indicator_nodes[i]):
 			exit_indicator_nodes[i].show()
 

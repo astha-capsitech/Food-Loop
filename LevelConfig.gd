@@ -21,6 +21,15 @@ class_name LevelConfig
 ## Rotation applied to the Sprite2D (radians).
 @export var route_rotation: float = 0.0
 
+# ─── Tilemap Route ────────────────────────────────────────────────────────────
+@export_group("Tilemap Route")
+## When true, uses modular road tiles from tilesprite.png instead of a single track texture.
+@export var use_tilemap: bool = false
+## Placed tiles dictionary: Vector2i(grid_x, grid_y) -> int (tile_id 0..14).
+@export var placed_tiles: Dictionary = {}
+## Step size in pixels per tile grid cell (default 96.0).
+@export var tile_grid_size: float = 96.0
+
 # ─── Loop Path ───────────────────────────────────────────────────────────────
 @export_group("Loop Path")
 ## Ordered points that define the closed food loop (sprite-local coordinates).
