@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dl2v0b5bgjgic"]
 
-[ext_resource type="Script" uid="uid://cofc1s2mkk15j" path="res://lose.gd" id="1_a6gma"]
+[ext_resource type="Script" uid="uid://cofc1s2mkk15j" path="res://Scripts/lose.gd" id="1_a6gma"]
 [ext_resource type="Texture2D" uid="uid://mmqhlqtqnprs" path="res://Assets/Sprites/Solid_green.png" id="1_mexgb"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_uvm4r"]

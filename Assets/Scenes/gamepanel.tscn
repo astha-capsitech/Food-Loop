@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://ilte4duf1i14"]
 
-[ext_resource type="Script" uid="uid://bs0dhd4fbjv0e" path="res://gamepanel.gd" id="1_gd74s"]
+[ext_resource type="Script" uid="uid://bs0dhd4fbjv0e" path="res://Scripts/gamepanel.gd" id="1_gd74s"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_uvm4r"]
 

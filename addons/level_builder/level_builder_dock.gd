@@ -15,7 +15,7 @@ const _LEVELS_DIR    := "res://Levels"
 const _SPRITES_DIR   := "res://Assets/Sprites"
 const _PREVIEW_TRES  := "res://Levels/_preview.tres"
 const _PREVIEW_FLAG  := "res://._preview"
-const _GAMEPLAY_SCENE := "res://Gameplay.tscn"
+const _GAMEPLAY_SCENE := "res://Assets/Scenes/Gameplay.tscn"
 
 # Fruit spritesheet data (mirrors FoodTextures.gd)
 const _FRUIT_SHEET := "res://Assets/Sprites/sprite-vegetable-fruit-animation-sprite-removebg-preview.png"

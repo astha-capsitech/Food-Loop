@@ -1,11 +1,11 @@
 [gd_scene format=3 uid="uid://dynqdsuy6xvoh"]
 
-[ext_resource type="Script" uid="uid://7xb7avdceh7m" path="res://Gameplay.gd" id="1_k2aq1"]
-[ext_resource type="PackedScene" uid="uid://bopa1hoxhm8ay" path="res://Food.tscn" id="2_vrd06"]
-[ext_resource type="PackedScene" uid="uid://ilte4duf1i14" path="res://gamepanel.tscn" id="4_pskrv"]
-[ext_resource type="PackedScene" uid="uid://e4kmnrm2uiyi" path="res://Wining.tscn" id="5_gqb3i"]
-[ext_resource type="PackedScene" uid="uid://bpkjsyo63ert6" path="res://start.tscn" id="6_yqu6c"]
-[ext_resource type="PackedScene" uid="uid://dl2v0b5bgjgic" path="res://Lose.tscn" id="7_wnni2"]
+[ext_resource type="Script" uid="uid://7xb7avdceh7m" path="res://Scripts/Gameplay.gd" id="1_k2aq1"]
+[ext_resource type="PackedScene" uid="uid://bopa1hoxhm8ay" path="res://Assets/Scenes/Food.tscn" id="2_vrd06"]
+[ext_resource type="PackedScene" uid="uid://ilte4duf1i14" path="res://Assets/Scenes/gamepanel.tscn" id="4_pskrv"]
+[ext_resource type="PackedScene" uid="uid://e4kmnrm2uiyi" path="res://Assets/Scenes/Wining.tscn" id="5_gqb3i"]
+[ext_resource type="PackedScene" uid="uid://bpkjsyo63ert6" path="res://Assets/Scenes/start.tscn" id="6_yqu6c"]
+[ext_resource type="PackedScene" uid="uid://dl2v0b5bgjgic" path="res://Assets/Scenes/Lose.tscn" id="7_wnni2"]
 
 [sub_resource type="Curve2D" id="Curve2D_loop"]
 _data = {

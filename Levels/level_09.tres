@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="LevelConfig" format=3 uid="uid://biphir18na1fg"]
+
+[ext_resource type="Script" uid="uid://dll23qn5vkui1" path="res://Scripts/EntryConfig.gd" id="1_3ydc7"]
+[ext_resource type="Script" uid="uid://dmahiwhvw8t5g" path="res://Scripts/ExitConfig.gd" id="2_lesow"]
+[ext_resource type="Script" uid="uid://cfjkkrdpu30da" path="res://Scripts/LevelConfig.gd" id="3_8cch1"]
+[ext_resource type="Texture2D" uid="uid://bmsfb8rpyprxu" path="res://Assets/Sprites/rectangle.png" id="4_lesow"]
+
+[sub_resource type="Resource" id="Resource_sqejx"]
+script = ExtResource("1_3ydc7")
+entry_point = Vector2(-7.413448, 195.52968)
+queue_base_position = Vector2(-7.413448, 239.52968)
+queue_fruit_indices = PackedInt32Array()
+
+[sub_resource type="Resource" id="Resource_tbum1"]
+script = ExtResource("2_lesow")
+exit_points = PackedVector2Array(3.8494704, -184.77458, 2.3096821, -283.321)
+assign_rule = "fruit_type"
+
+[resource]
+script = ExtResource("3_8cch1")
+level_number = 9
+title = "Level 9"
+track_texture = ExtResource("4_lesow")
+loop_points = PackedVector2Array(-67.36485, -178.48215, 128.47937, -172.92628, 140.98006, 90.97728, 127.0904, 164.59248, 56.253128, 178.48215, -17.362076, 182.64905, -115.97867, 178.48215, -145.14696, 117.36764, -146.53592, -3.4724152, -142.36902, -86.81038, -121.53453, -159.03662)
+entry_configs = Array[ExtResource("1_3ydc7")]([SubResource("Resource_sqejx")])
+entry_points = PackedVector2Array(-7.413448, 195.52968)
+has_exit = true
+exit_configs = Array[ExtResource("2_lesow")]([SubResource("Resource_tbum1")])
+queue_fruit_indices = PackedInt32Array()
+queue_base_position = Vector2(352.58655, 879.52966)
+initial_fruit_indices = PackedInt32Array(9, 8, 7, 0, 0)
+fruit_sizes = PackedFloat32Array()
